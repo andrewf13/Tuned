@@ -15,7 +15,7 @@ class RemoteStore(context: Context) {
         }
         set(v) {
             val e = sp.edit()
-            if (v == null) e.remove("name").remove("host").remove("port").remove("token").remove("widgetChannels").remove("nowPlaying") else e.putString("name", v.name).putString("host", v.host).putInt("port", v.port).putString("token", v.token)
+            if (v == null) e.remove("name").remove("host").remove("port").remove("token").remove("widgetChannels").remove("nowPlaying").remove("sportsCache") else e.putString("name", v.name).putString("host", v.host).putInt("port", v.port).putString("token", v.token)
             e.apply()
         }
 
@@ -38,27 +38,22 @@ class RemoteStore(context: Context) {
         set(v) = sp.edit().putString("nowPlaying", v).apply()
 
     // ---- Sports guide ----
-    /** TheSportsDB key ("123" is the free test key: one listing per request). */
-    var sportsKey: String
-        get() = sp.getString("sportsKey", "")!!
-        set(v) = sp.edit().putString("sportsKey", v.trim()).apply()
     var sports: Set<String>
-        get() = sp.getStringSet("sports", com.andrewf13.tuned.remote.sports.Sports.defaultSports)!!.toSet()
-        set(v) = sp.edit().putStringSet("sports", v).apply()
-    var sportsCountries: Set<String>
-        get() = sp.getStringSet("sportsCountries", com.andrewf13.tuned.remote.sports.Sports.defaultCountries)!!.toSet()
-        set(v) = sp.edit().putStringSet("sportsCountries", v).apply()
+        get() = sp.getStringSet("sportIds", com.andrewf13.tuned.remote.sports.Sports.defaultSports)!!.toSet()
+        set(v) = sp.edit().putStringSet("sportIds", v).apply()
     var sportsKeywords: List<String>
-        get() = sp.getString("sportsKeywords", null)?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }
-            ?: com.andrewf13.tuned.remote.sports.Sports.defaultKeywords
-        set(v) = sp.edit().putString("sportsKeywords", v.joinToString(",")).apply()
-    /** Channels you picked yourself for a broadcaster: "Fox Cricket|Australia" → channel id on the TV. */
-    var channelPicks: Map<String, Int>
-        get() = sp.getString("channelPicks", "")!!.split('\n').mapNotNull { l ->
-            val id = l.substringAfterLast('\t').toIntOrNull() ?: return@mapNotNull null
-            l.substringBeforeLast('\t') to id
-        }.toMap()
-        set(v) = sp.edit().putString("channelPicks", v.entries.joinToString("\n") { "${it.key}\t${it.value}" }).apply()
+        get() = sp.getString("sportsKeywords2", "")!!.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        set(v) = sp.edit().putString("sportsKeywords2", v.joinToString(",")).apply()
+    var sportsReplays: Boolean
+        get() = sp.getBoolean("sportsReplays", false)
+        set(v) = sp.edit().putBoolean("sportsReplays", v).apply()
+    /** Last sports guide from the TV, so the tab works while the TV is off. */
+    var sportsCache: String?
+        get() = sp.getString("sportsCache", null)
+        set(v) = sp.edit().putString("sportsCache", v).apply()
+    var sportsCatalog: String?
+        get() = sp.getString("sportsCatalog", null)
+        set(v) = sp.edit().putString("sportsCatalog", v).apply()
 
     var lastFilter: String
         get() = sp.getString("filter", "fav")!!

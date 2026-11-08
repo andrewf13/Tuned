@@ -98,26 +98,45 @@ class TvClient(val host: String, val port: Int, var token: String? = null) {
 
     suspend fun state(): TvState = state(call("/api/state"))
 
-    data class Candidate(val channel: TvChannel, val groupName: String, val score: Int)
+    /** The sports the TV guide recognises, as raw JSON (cached by the phone). */
+    suspend fun sportsCatalogJson(): String = call("/api/sports/catalog").toString()
 
-    /** For each (name, country) broadcaster: the TV's channels that carry it, best first. Key: "name|country". */
-    suspend fun match(broadcasters: List<Pair<String, String>>): Map<String, List<Candidate>> {
-        if (broadcasters.isEmpty()) return emptyMap()
-        val body = JsonObject(
+    /** Matches from the TV guide, as raw JSON (cached by the phone for when the TV is off). */
+    suspend fun sportsJson(sports: Set<String>, keywords: List<String>, replays: Boolean): String = call(
+        "/api/sports",
+        JsonObject(
             mapOf(
-                "broadcasters" to JsonArray(
-                    broadcasters.map { (n, c) -> JsonObject(mapOf("name" to JsonPrimitive(n), "country" to JsonPrimitive(c))) },
-                ),
+                "sports" to JsonArray(sports.map { JsonPrimitive(it) }),
+                "keywords" to JsonArray(keywords.map { JsonPrimitive(it) }),
+                "replays" to JsonPrimitive(replays),
             ),
-        )
-        val o = call("/api/match", body)["matches"] as? JsonObject ?: return emptyMap()
-        return o.entries.associate { (k, v) ->
-            k to (v as JsonArray).map {
-                val c = it.jsonObject
-                Candidate(channel(c), c["groupName"]?.jsonPrimitive?.content.orEmpty(), c["score"]?.jsonPrimitive?.int ?: 0)
-            }
+        ),
+    ).toString()
+
+    fun parseCatalog(text: String): List<com.andrewf13.tuned.remote.sports.SportItem> = runCatching {
+        json.parseToJsonElement(text).jsonObject["sports"]!!.jsonArray.map {
+            val o = it.jsonObject
+            com.andrewf13.tuned.remote.sports.SportItem(o["id"]!!.jsonPrimitive.content, o["label"]!!.jsonPrimitive.content, o["emoji"]?.jsonPrimitive?.content ?: "🏆")
         }
-    }
+    }.getOrDefault(emptyList())
+
+    /** Returns (when the TV's guide was updated, events). */
+    fun parseSports(text: String): Pair<Long, List<com.andrewf13.tuned.remote.sports.SportEvent>> = runCatching {
+        val o = json.parseToJsonElement(text).jsonObject
+        (o["updated"]?.jsonPrimitive?.long ?: 0L) to o["events"]!!.jsonArray.map {
+            val e = it.jsonObject
+            com.andrewf13.tuned.remote.sports.SportEvent(
+                title = e["title"]!!.jsonPrimitive.content,
+                sub = (e["sub"] as? JsonPrimitive)?.takeIf { p -> p !is JsonNull }?.content,
+                sport = (e["sport"] as? JsonPrimitive)?.takeIf { p -> p !is JsonNull }?.content,
+                startMs = e["start"]!!.jsonPrimitive.long, endMs = e["end"]!!.jsonPrimitive.long,
+                live = e["live"]?.jsonPrimitive?.boolean ?: false, replay = e["replay"]?.jsonPrimitive?.boolean ?: false,
+                followed = e["followed"]?.jsonPrimitive?.boolean ?: false,
+                channels = e["channels"]!!.jsonArray.map { c -> channel(c.jsonObject) },
+            )
+        }
+    }.getOrDefault(0L to emptyList())
+
     suspend fun play(id: Int): TvState = state(call("/api/play", obj("id" to id)))
     suspend fun unpair() { runCatching { call("/api/unpair", JsonObject(emptyMap())) } }
 }

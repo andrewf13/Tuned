@@ -33,6 +33,41 @@ class Repository(private val context: Context) {
         profile = p
         client = if (p?.type == SourceType.XTREAM) XtreamClient(http, p.account) else null
         epgCache.clear()
+        guide?.close()
+        guide = p?.let { com.andrewf13.tuned.data.guide.GuideStore(context, it.id) }
+    }
+
+    /** The full TV guide (provider + community guides), per profile. */
+    var guide: com.andrewf13.tuned.data.guide.GuideStore? = null
+        private set
+
+    /**
+     * Rebuild the TV guide: the provider's own guide (Xtream), then epgshare01 for [countries].
+     * Returns a short summary, e.g. "Guide for 412 of 450 channels".
+     */
+    suspend fun refreshGuide(channels: List<Channel>, kept: Set<Int>, countries: Set<String>, fromProvider: Boolean): String = withContext(Dispatchers.IO) {
+        val store = guide ?: throw XtreamException("No provider set up")
+        val loader = com.andrewf13.tuned.data.guide.GuideLoader(channels, kept, System.currentTimeMillis())
+        val big = http.newBuilder().readTimeout(120, TimeUnit.SECONDS).build()
+        val failed = ArrayList<String>()
+        fun open(url: String, use: (java.io.InputStream) -> Unit, label: String) {
+            runCatching {
+                big.newCall(Request.Builder().url(url).build()).execute().use { r ->
+                    if (!r.isSuccessful) throw XtreamException("HTTP ${r.code}")
+                    use(r.body!!.byteStream())
+                }
+            }.onFailure { failed += label }
+        }
+        if (fromProvider) client?.let { c -> open(c.xmltvUrl(), { loader.addProvider(it) }, "provider guide") }
+        for (code in countries) {
+            val country = com.andrewf13.tuned.data.guide.GuideSources.byCode(code) ?: continue
+            for (f in country.files) open(com.andrewf13.tuned.data.guide.GuideSources.EPGSHARE + f, { loader.addCountryGuide(it, country, f) }, "$code guide")
+        }
+        val b = loader.build()
+        if (b.rows.isEmpty() && failed.isNotEmpty()) throw XtreamException("Couldn't download the guide (${failed.joinToString()})")
+        store.replace(b, System.currentTimeMillis())
+        epgCache.clear()
+        "Guide for ${b.keptCovered} of ${b.keptTotal} channels in your list" + if (failed.isNotEmpty()) " · couldn't get: ${failed.joinToString()}" else ""
     }
 
     fun clientFor(a: Account) = XtreamClient(http, a)
@@ -115,6 +150,8 @@ class Repository(private val context: Context) {
     /** Now/next for one channel (Xtream only), cached until the current show ends (or 15 min if empty). */
     suspend fun epg(streamId: Int): List<Programme> {
         val now = System.currentTimeMillis()
+        // The full guide first; the provider's per-channel now/next as a fallback.
+        guide?.let { g -> runCatching { withContext(Dispatchers.IO) { g.upcoming(streamId, now) } }.getOrNull()?.takeIf { it.isNotEmpty() }?.let { return it } }
         epgCache[streamId]?.let { c ->
             val fresh = if (c.items.isEmpty()) now - c.fetchedAt < 15 * 60_000 else c.items.any { it.isOn(now) }
             if (fresh) return c.items

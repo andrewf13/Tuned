@@ -52,34 +52,46 @@ object ChannelMatcher {
             .filter { it !in quality && !(it.length <= 3 && it in countryCodes && it != "1") }
     }
 
+    /** Pre-tokenised channels, so thousands of guide channels can be matched against a big lineup quickly. */
+    class Index(val channels: List<Channel>) {
+        private class Entry(val ch: Channel, val tokens: Set<String>, val numbers: Set<String>, val country: String?, val better: Boolean)
+        private val entries = channels.map { c ->
+            val t = tokens(c.name)
+            Entry(c, t.toSet(), t.filter { it.all(Char::isDigit) }.toSet(), channelCountry(c.name) ?: countryToken(c.name),
+                c.name.contains("4k", true) || c.name.contains("uhd", true))
+        }
+        private val byToken = HashMap<String, MutableList<Int>>().also { m ->
+            entries.forEachIndexed { i, e -> e.tokens.forEach { m.getOrPut(it) { ArrayList() }.add(i) } }
+        }
+
+        fun match(broadcaster: String, country: String?, preferred: Set<Int>, limit: Int = 3, minScore: Int = Int.MIN_VALUE): List<Match> {
+            val want = tokens(broadcaster).toSet()
+            if (want.isEmpty()) return emptyList()
+            val wantNumbers = want.filter { it.all(Char::isDigit) }.toSet()
+            val cc = countryCode(country)
+            // Only channels containing the rarest wanted word can match.
+            val rarest = want.minByOrNull { byToken[it]?.size ?: 0 }!!
+            val out = ArrayList<Match>()
+            for (i in byToken[rarest] ?: return emptyList()) {
+                val e = entries[i]
+                if (!e.tokens.containsAll(want) || e.numbers != wantNumbers) continue
+                var score = 100 - 6 * (e.tokens.size - want.size) // fewer extra words = closer
+                if (cc != null && e.country != null) {
+                    if (e.country != cc) continue // e.g. US "Fox Sports 1" is not Australia's
+                    score += 25
+                }
+                if (e.ch.streamId in preferred) score += 15
+                if (e.better) score += 1 // tie-break: the better picture
+                if (score >= minScore) out += Match(e.ch, score)
+            }
+            return out.sortedByDescending { it.score }.take(limit)
+        }
+    }
+
     /**
      * Best channels for [broadcaster], strongest first. [preferred] channels (favourites and the TV's
      * ticked list) win ties; a matching country tag helps.
      */
-    fun match(broadcaster: String, country: String?, channels: List<Channel>, preferred: Set<Int>, limit: Int = 3): List<Match> {
-        val want = tokens(broadcaster)
-        if (want.isEmpty()) return emptyList()
-        val wantNumbers = want.filter { it.all(Char::isDigit) }.toSet()
-        val cc = countryCode(country)
-        val out = ArrayList<Match>()
-        for (c in channels) {
-            val have = tokens(c.name)
-            if (have.isEmpty()) continue
-            val haveSet = have.toSet()
-            if (!want.all { it in haveSet }) continue
-            // Numbers in the channel name must be the broadcaster's numbers: "Sky Sport 1" ≠ "Sky Sport 1 Extra 2".
-            val haveNumbers = have.filter { it.all(Char::isDigit) }.toSet()
-            if (haveNumbers != wantNumbers) continue
-            var score = 100 - 6 * (haveSet.size - want.toSet().size) // fewer extra words = closer
-            val chCountry = channelCountry(c.name) ?: countryToken(c.name)
-            if (cc != null && chCountry != null) {
-                if (chCountry != cc) continue // e.g. US "Fox Sports 1" is not Australia's
-                score += 25
-            }
-            if (c.streamId in preferred) score += 15
-            if (c.name.contains("4k", true) || c.name.contains("uhd", true)) score += 1 // tie-break: the better picture
-            out += Match(c, score)
-        }
-        return out.sortedByDescending { it.score }.take(limit)
-    }
+    fun match(broadcaster: String, country: String?, channels: List<Channel>, preferred: Set<Int>, limit: Int = 3): List<Match> =
+        Index(channels).match(broadcaster, country, preferred, limit)
 }

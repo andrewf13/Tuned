@@ -12,14 +12,14 @@ A fast, simple IPTV player for Android TV and Fire TV. Sign in with Xtream Codes
 
 There's **one APK for every device below**: the same file works on all of them.
 
-**[⬇ Download the latest APK](https://github.com/andrewf13/Tuned/raw/main/releases/tuned-latest.apk)** (10 MB, Android 6.0 or newer). Current version **0.9.0** · SHA-256 in [`releases/tuned-0.9.0.apk.sha256`](releases/tuned-0.9.0.apk.sha256)
+**[⬇ Download the latest APK](https://github.com/andrewf13/Tuned/raw/main/releases/tuned-latest.apk)** (10 MB, Android 6.0 or newer). Current version **1.0.0** · SHA-256 in [`releases/tuned-1.0.0.apk.sha256`](releases/tuned-1.0.0.apk.sha256)
 
 **Link to type into Downloader on your TV** (always the newest version):
 ```
 https://github.com/andrewf13/Tuned/raw/main/releases/tuned-latest.apk
 ```
 
-**📱 Phone & tablet remote (optional):** [⬇ Tuned Remote](https://github.com/andrewf13/Tuned/raw/main/releases/tuned-remote-latest.apk) (7 MB, Android 8.0+ phones and tablets). Current version **0.9.0**, with the **sports guide**. See [section 6](#6-phone-remote).
+**📱 Phone & tablet remote (optional):** [⬇ Tuned Remote](https://github.com/andrewf13/Tuned/raw/main/releases/tuned-remote-latest.apk) (7 MB, Android 8.0+ phones and tablets). Current version **1.0.0**, with the **sports guide**. See [section 6](#6-phone-remote).
 
 | Device | Status | Refresh-rate switching | HDR |
 |---|---|---|---|
@@ -206,28 +206,35 @@ Ticking a channel in an unticked group shows the group again, with just your tic
 - The guide on the phone is the same as on the TV: if your provider doesn't send guide data, it says "No guide information".
 
 ### Sports guide (in Tuned Remote)
-The **Sports** tab shows your sports, **which channel they're on**, and **tapping a channel changes it on the TV**.
+The **Sports** tab finds your sports in the TV guide, shows **which channels they're on**, and **tapping a channel changes it on the TV**. No account or subscription needed.
 
 ![Sports guide on a phone](docs/sports-phone.png)
 
-1. Open Tuned Remote → **Sports** → **Setup**.
-2. Enter a **[TheSportsDB](https://www.thesportsdb.com) key**. Their premium key (about US$9/month via Patreon) gives a week of TV listings. The free test key **123** shows just one listing per sport per day, enough to try it.
-3. Pick your **sports** (cricket, AFL, rugby, motorsport, NFL, football, tennis, …) and the **countries whose channels your provider carries** (e.g. Australia, NZ, UK, Canada).
-4. Optionally add **keywords** to follow (e.g. *Formula 1, MotoGP, Swans, All Blacks*): matching events get a ★ and show under **★ Followed**.
+1. Open Tuned Remote → **Sports** → **⚙ Sports**.
+2. Pick your **sports**: cricket, AFL, NRL & rugby league, rugby union, Formula 1, MotoGP, rally, NFL, football, tennis, golf and more.
+3. Optionally add teams or events to **follow** (e.g. *Swans, All Blacks, Big Bash*): they get a ★ and their own **★ Followed** filter.
+4. **Show replays & highlights** is off by default, so you see live coverage and new matches, not last week's game at 3 AM.
 
-| On a match | What it does |
-|---|---|
-| A channel showing **▶ your channel's name** | Tap: the TV changes to it |
-| **Not in your channels** | The broadcaster isn't in your provider's list (e.g. a streaming-only service) |
-| **Hold** any channel | Choose the right channel yourself. Remembered, marked *(your pick)*; "Automatic" undoes it |
+Each match shows **LIVE** when the guide says it's live, the time, and every channel showing it (your favourites first). **Tap a channel** and the TV switches to it.
 
-Events are grouped **Live now / Today / Tomorrow / later**, in your phone's time zone. Matching is done by the TV against **all** your provider's channels (including groups you've unticked), so `TSN 1` finds `CA| TSN1 FHD` and `Sky Sports F1` finds `UK: SKY SPORTS F1 HD`. Numbers must match exactly, and a channel tagged with a different country is never used.
+**When the TV is off**, the phone shows the sports guide it saved last time (with a note saying so), so you can still check when the cricket starts. Turn the TV on and open Tuned (e.g. with a Google Assistant routine) to watch.
 
 On a tablet the matches fill the screen as cards:
 
 ![Sports guide on a tablet](docs/sports-tablet.png)
 
-Sports listings © [TheSportsDB](https://www.thesportsdb.com), used under their API terms. Needs Tuned 0.9 or later on the TV.
+## 6a. TV guide
+Tuned builds its TV guide from layered sources (TV: **Settings → TV guide**):
+
+1. **Your provider's guide** (Xtream Codes `xmltv.php`), matched exactly by the provider's guide ids.
+2. **Free community guides from [epgshare01](https://epgshare01.online/epgshare01/)** for the countries you tick (Australia and New Zealand by default; also UK, Canada, US, Ireland, South Africa, India). These fill in channels your provider's guide misses, such as Fox Cricket, Fox Footy, Fox League, Fox Sports 503–506, ESPN, beIN, and Sky Sport 1–9 NZ. They're matched to your channels by name (e.g. "Fox Cricket" → `AU| FOX CRICKET FHD`), and a channel from a different country is never used.
+
+![TV guide settings](docs/guide-settings.png)
+
+- The guide updates in the background about **twice a day**; **Update now** refreshes it immediately.
+- It powers *what's on* in the TV's channel list and info bar, the phone's guide, and the Sports tab.
+- To stay small (even with tens of thousands of channels), the full guide is kept for the channels in your list and favourites; for every other channel only sport is kept, so the Sports tab can still find a match on a channel you've hidden.
+- The screen shows how much of your list it covers, e.g. *Guide for 412 of 450 channels in your list*.
 
 ## 7. Backup & restore
 
@@ -253,7 +260,7 @@ A backup holds **every profile** (logins and playlist links) with each one's **f
 | Picture isn't HDR | Use a 4K HDR channel and check your TV's input supports HDR (e.g. Sony "Enhanced format") |
 | Quiet channel | Settings → Volume boost |
 | Phone can't find the TV | Tuned must be open on the TV, same Wi-Fi. Or type the address from TV Settings → Phone remote |
-| No "what's on" text | Your provider doesn't send guide data for that channel |
+| No "what's on" text | TV → Settings → TV guide: tick the countries your channels are from and press Update now |
 
 ---
 

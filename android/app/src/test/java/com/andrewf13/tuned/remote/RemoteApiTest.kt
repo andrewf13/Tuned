@@ -41,6 +41,9 @@ class RemoteApiTest {
         override fun pairingDone(device: String, ok: Boolean) {}
         override fun loadTokens() = stored
         override fun saveTokens(tokens: Map<String, String>) { stored = tokens.toMap() }
+        var guide: SportsResult? = null
+        var asked: Triple<Set<String>, List<String>, Boolean>? = null
+        override fun sports(sports: Set<String>, keywords: List<String>, replays: Boolean): SportsResult? { asked = Triple(sports, keywords, replays); return guide }
     }
 
     private val tv = FakeTv()
@@ -101,5 +104,19 @@ class RemoteApiTest {
         val everything = listOf("/api/state", "/api/channels", "/api/guide?ids=100").joinToString { call(it, token = token).second }
         assertFalse(everything.contains("password", ignoreCase = true))
         assertFalse(everything.contains("username", ignoreCase = true))
+    }
+
+    @Test fun sportsComeFromTheGuide() {
+        call("/api/pair/start", """{"device":"x"}""")
+        val token = json(call("/api/pair/finish", """{"code":"${tv.code}"}""").second)["token"]!!.jsonPrimitive.content
+        assertEquals(409, call("/api/sports", """{"sports":["cricket"]}""", token).first) // guide not downloaded yet
+        tv.guide = SportsResult(123, listOf(SportsEvent("LIVE: WBBL - Heat v Hurricanes", null, "cricket", 1, 2, true, false, false, tv.list.take(1))))
+        val out = json(call("/api/sports", """{"sports":["cricket","afl"],"keywords":["Swans"],"replays":false}""", token).second)
+        assertEquals(Triple(setOf("cricket", "afl"), listOf("Swans"), false), tv.asked)
+        val e = out["events"]!!.jsonArray[0].jsonObject
+        assertEquals("LIVE: WBBL - Heat v Hurricanes", e["title"]!!.jsonPrimitive.content)
+        assertEquals("true", e["live"]!!.jsonPrimitive.content)
+        assertEquals("Fox Footy HD", e["channels"]!!.jsonArray[0].jsonObject["name"]!!.jsonPrimitive.content)
+        assertTrue(json(call("/api/sports/catalog", token = token).second)["sports"]!!.jsonArray.size >= 15)
     }
 }

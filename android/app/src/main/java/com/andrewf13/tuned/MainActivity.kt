@@ -66,6 +66,7 @@ class MainActivity : ComponentActivity() {
                 Screen.GroupChannels -> GroupChannelsScreen(vm)
                 Screen.Backup -> BackupScreen(vm, onBack = vm::closeBackup)
                 Screen.Profiles -> ProfilesScreen(vm)
+                Screen.Guide -> com.andrewf13.tuned.ui.GuideScreen(vm)
             }
         }
     }

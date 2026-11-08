@@ -388,4 +388,11 @@ class ScreenshotTest {
         assertEquals(setOf(5, 6), p.current.favourites)
         assertEquals("aurora", p.themeId)
     }
+
+    @Test fun guideSettings() {
+        val vm = seededVm()
+        waitLoaded(vm)
+        compose.setContent { TunedTheme { GuideScreen(vm) } }
+        shot("guide-settings")
+    }
 }

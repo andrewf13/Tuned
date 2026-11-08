@@ -24,8 +24,9 @@ echo "sdk.dir=/path/to/android-sdk" > local.properties
 - `data/`: Xtream API client and lenient parsing, cached channel list, now/next EPG cache, preferences
 - `player/`: Media3 setup, frame-rate measurement, display-mode choice (`FrameRates`, unit-tested), `RefreshRateMatcher`
 - `remote/`: phone-remote server on the TV: a tiny local-network HTTP server, mDNS announcement (`_tuned._tcp`), pairing codes and tokens (`RemoteApi` documents the endpoints)
-- `remote/ChannelMatcher.kt`: matches sports-listing broadcaster names to provider channels (unit-tested with real-world names)
-- `phone/.../sports/`: TheSportsDB client (v2 premium / v1 free key), event grouping, matching via the TV, Sports tab
+- `data/guide/`: TV guide. Streaming XMLTV reader, layered loader (provider guide, then epgshare01 country guides), SQLite store per profile, sports recogniser (`SportsCatalog`, tested on real Foxtel / Sky NZ / TSN listings)
+- `remote/ChannelMatcher.kt`: matches guide channel names to provider channels (indexed for big lineups; numbers and countries must agree)
+- `phone/.../sports/`: Sports tab: matches from the TV's guide, saved on the phone for when the TV is off
 - `phone/`: Tuned Remote. Finds the TV over mDNS, pairs with the code, lists channels and guide, changes channel
 - `data/M3u.kt`: M3U/M3U8 playlist parser · `data/NetworkDoctor.kt`: internet / provider / account checks for the buffering panel
 - `data/Prefs.kt`: app settings, profiles, and per-profile state (favourites, groups, recents)

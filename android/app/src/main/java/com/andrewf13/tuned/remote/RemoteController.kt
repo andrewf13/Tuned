@@ -49,6 +49,29 @@ class RemoteController(private val vm: AppViewModel, private val discovery: Remo
     override fun groups() = onMain { vm.categories.map { it.id to it.name } }
     override fun channels(): List<Channel> = onMain { vm.remoteChannels() }
     override fun allChannels(): List<Channel> = onMain { vm.channels }
+
+    override fun sports(sports: Set<String>, keywords: List<String>, replays: Boolean): SportsResult? {
+        val store = vm.repo.guide ?: return null
+        if (store.updatedAt == 0L) return null
+        val now = System.currentTimeMillis()
+        val rows = store.sports(sports, keywords, replays, now, now + 7 * 86_400_000L)
+        val (all, preferred) = onMain { vm.channels.associateBy { it.streamId } to (vm.remoteChannels().map { it.streamId }.toSet() + vm.favourites) }
+        val kw = keywords.map { it.trim() }.filter { it.isNotEmpty() }
+        // One event per programme title + start time, gathering every channel showing it.
+        val grouped = rows.groupBy { "${it.row.title.lowercase()}|${it.row.sub?.lowercase()}|${it.row.startMs / 600_000}" }
+        val events = grouped.values.map { group ->
+            val r = group.first().row
+            val chans = group.flatMap { it.streams }.distinct().mapNotNull { all[it] }
+                .sortedWith(compareByDescending<Channel> { it.streamId in preferred }.thenBy { it.name.length })
+                .take(6)
+            SportsEvent(
+                r.title, r.sub, group.firstNotNullOfOrNull { it.row.sport }, r.startMs, r.stopMs,
+                group.any { it.row.live }, group.all { it.row.replay },
+                kw.any { k -> r.title.contains(k, true) || r.sub.orEmpty().contains(k, true) }, chans,
+            )
+        }.filter { it.channels.isNotEmpty() }.sortedWith(compareBy({ it.startMs }, { it.title })).take(400)
+        return SportsResult(store.updatedAt, events)
+    }
     override fun favourites() = onMain { vm.favourites }
     override fun playing() = onMain { vm.playing }
     override fun groupName(id: String?) = onMain { vm.groupNameFor(id) }

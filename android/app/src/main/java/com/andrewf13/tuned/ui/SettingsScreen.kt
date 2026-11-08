@@ -70,6 +70,13 @@ fun SettingsScreen(vm: AppViewModel, matcher: RefreshRateMatcher, onExit: () -> 
             }
             item {
                 SettingRow(
+                    "TV guide", if (vm.guideBusy) "Updating…" else "",
+                    "Your provider's guide plus free community guides (epgshare01) for the channels it misses. Powers what's on and the Sports guide on your phone.",
+                    onClick = vm::openGuideSettings,
+                )
+            }
+            item {
+                SettingRow(
                     "Colour", Palette.theme.name,
                     "Graphite grey, Midnight blue, Pitch green or Aurora violet. OK to cycle.",
                     onClick = vm::cycleTheme,

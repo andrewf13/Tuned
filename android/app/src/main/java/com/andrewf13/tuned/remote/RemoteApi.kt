@@ -15,6 +15,12 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 
+data class SportsEvent(
+    val title: String, val sub: String?, val sport: String?, val startMs: Long, val endMs: Long,
+    val live: Boolean, val replay: Boolean, val followed: Boolean, val channels: List<Channel>,
+)
+data class SportsResult(val updatedMs: Long, val events: List<SportsEvent>)
+
 /** What the remote API needs from the TV app. Kept small so it's easy to test. */
 interface RemoteHost {
     val tvName: String
@@ -22,7 +28,9 @@ interface RemoteHost {
     fun profileName(): String?
     fun groups(): List<Pair<String, String>>           // id → name, in list order
     fun channels(): List<Channel>                       // everything visible in the TV's list
-    fun allChannels(): List<Channel> = channels()       // every channel the provider has (for sports matching)
+    fun allChannels(): List<Channel> = channels()       // every channel the provider has
+    /** Sports from the TV guide, or null if the guide isn't downloaded yet. */
+    fun sports(sports: Set<String>, keywords: List<String>, replays: Boolean): SportsResult? = null
     fun favourites(): Set<Int>
     fun playing(): Channel?
     fun groupName(id: String?): String?
@@ -46,7 +54,8 @@ interface RemoteHost {
  *   GET  /api/channels                   → groups and channels in the TV's list  (token)
  *   GET  /api/guide?ids=1,2,3            → now/next for up to 60 channels        (token)
  *   POST /api/play {id}                  → change channel on the TV              (token)
- *   POST /api/match {broadcasters:[{name,country}]} → best channels for each   (token)
+ *   GET  /api/sports/catalog              → the sports the guide recognises      (token)
+ *   POST /api/sports {sports, keywords, replays} → matches from the TV guide    (token)
  *
  * Never sends the provider login.
  */
@@ -74,7 +83,8 @@ class RemoteApi(private val host: RemoteHost) {
             req.path == "/api/channels" -> HttpResponse(200, channels().toString())
             req.path == "/api/guide" -> guide(req)
             req.path == "/api/play" && req.method == "POST" -> play(req)
-            req.path == "/api/match" && req.method == "POST" -> match(req)
+            req.path == "/api/sports/catalog" -> HttpResponse(200, catalog().toString())
+            req.path == "/api/sports" && req.method == "POST" -> sports(req)
             req.path == "/api/unpair" && req.method == "POST" -> synchronized(this) { tokens.remove(token); host.saveTokens(tokens); ok("ok" to true) }
             else -> HttpResponse(404, err("Not found"))
         }
@@ -175,27 +185,48 @@ class RemoteApi(private val host: RemoteHost) {
         )
     }
 
-    /**
-     * Sports guide: for each broadcaster in a listing, the provider channels that carry it.
-     * Searches every channel (not just ticked groups); favourites and the ticked list win ties.
-     */
-    private fun match(req: HttpRequest): HttpResponse {
-        val list = (body(req)["broadcasters"] as? JsonArray)?.take(200) ?: return HttpResponse(400, err("Missing broadcasters"))
-        val all = host.allChannels()
-        val preferred = host.channels().map { it.streamId }.toSet() + host.favourites()
-        val favs = host.favourites()
-        val out = list.mapNotNull { el ->
-            val o = el as? JsonObject ?: return@mapNotNull null
-            val name = o["name"]?.jsonPrimitive?.content ?: return@mapNotNull null
-            val country = o["country"]?.jsonPrimitive?.content
-            val key = "$name|${country.orEmpty()}"
-            key to JsonArray(
-                ChannelMatcher.match(name, country, all, preferred).map { m ->
-                    JsonObject(channelJson(m.channel, favs) + ("score" to JsonPrimitive(m.score)) + ("groupName" to JsonPrimitive(host.groupName(m.channel.categoryId) ?: "")))
+    private fun catalog() = JsonObject(
+        mapOf(
+            "sports" to JsonArray(
+                com.andrewf13.tuned.data.guide.SportsCatalog.all.map {
+                    JsonObject(mapOf("id" to JsonPrimitive(it.id), "label" to JsonPrimitive(it.label), "emoji" to JsonPrimitive(it.emoji)))
                 },
-            )
-        }
-        return HttpResponse(200, JsonObject(mapOf("matches" to JsonObject(out.toMap()))).toString())
+            ),
+        ),
+    )
+
+    /**
+     * Sports guide: matches from the TV guide for the chosen sports and keywords, one entry per
+     * event with every channel showing it (favourites and the ticked list first).
+     */
+    private fun sports(req: HttpRequest): HttpResponse {
+        val b = body(req)
+        val sports = (b["sports"] as? JsonArray)?.map { it.jsonPrimitive.content }?.toSet().orEmpty()
+        val keywords = (b["keywords"] as? JsonArray)?.map { it.jsonPrimitive.content }.orEmpty()
+        val replays = b["replays"]?.jsonPrimitive?.content == "true"
+        val result = host.sports(sports, keywords, replays) ?: return HttpResponse(409, err("The TV guide hasn't downloaded yet"))
+        val favs = host.favourites()
+        return HttpResponse(
+            200,
+            JsonObject(
+                mapOf(
+                    "updated" to JsonPrimitive(result.updatedMs),
+                    "events" to JsonArray(
+                        result.events.map { e ->
+                            JsonObject(
+                                mapOf(
+                                    "title" to JsonPrimitive(e.title), "sub" to (e.sub?.let { JsonPrimitive(it) } ?: JsonNull),
+                                    "sport" to (e.sport?.let { JsonPrimitive(it) } ?: JsonNull),
+                                    "start" to JsonPrimitive(e.startMs), "end" to JsonPrimitive(e.endMs),
+                                    "live" to JsonPrimitive(e.live), "replay" to JsonPrimitive(e.replay), "followed" to JsonPrimitive(e.followed),
+                                    "channels" to JsonArray(e.channels.map { c -> JsonObject(channelJson(c, favs) + ("groupName" to JsonPrimitive(host.groupName(c.categoryId) ?: ""))) }),
+                                ),
+                            )
+                        },
+                    ),
+                ),
+            ).toString(),
+        )
     }
 
     private fun play(req: HttpRequest): HttpResponse {

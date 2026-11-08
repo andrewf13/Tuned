@@ -17,7 +17,7 @@ import com.andrewf13.tuned.data.Repository
 import kotlinx.coroutines.launch
 
 /** Login is the add/edit-profile form (also the first-run screen). */
-enum class Screen { Login, Loading, Home, Player, Settings, Groups, GroupChannels, Backup, Profiles }
+enum class Screen { Login, Loading, Home, Player, Settings, Groups, GroupChannels, Backup, Profiles, Guide }
 
 data class RailItem(val key: String, val label: String, val count: Int?)
 
@@ -166,6 +166,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 apply(repo.loadFresh())
                 status = null
                 if (cached == null) enterHome(resume)
+                refreshGuide()
             } catch (e: Exception) {
                 status = if (cached == null) "Couldn't load channels: ${e.message}" else "Showing your saved channel list (${e.message})"
                 if (cached == null) screen = Screen.Home
@@ -384,6 +385,41 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     suspend fun accountInfo(): AccountInfo? = runCatching { repo.client?.authenticate() }.getOrNull()
+
+    // ---- TV guide -------------------------------------------------------------------------
+    var guideCountries by mutableStateOf(prefs.guideCountries)
+        private set
+    var guideFromProvider by mutableStateOf(prefs.guideFromProvider)
+        private set
+    var guideBusy by mutableStateOf(false)
+        private set
+    var guideStatus by mutableStateOf<String?>(null)
+        private set
+
+    fun toggleGuideCountry(code: String) {
+        guideCountries = if (code in guideCountries) guideCountries - code else guideCountries + code
+        prefs.guideCountries = guideCountries
+    }
+    fun toggleGuideFromProvider() { guideFromProvider = !guideFromProvider; prefs.guideFromProvider = guideFromProvider }
+    fun openGuideSettings() { screen = Screen.Guide }
+
+    /** Rebuild the guide if it's older than 12 hours (or now, if [force]). Runs in the background. */
+    fun refreshGuide(force: Boolean = false) {
+        if (guideBusy || channels.isEmpty()) return
+        val store = repo.guide ?: return
+        if (!force && System.currentTimeMillis() - store.updatedAt < 12 * 3_600_000L) return
+        viewModelScope.launch {
+            guideBusy = true
+            guideStatus = "Updating the TV guide…"
+            guideStatus = try {
+                repo.refreshGuide(channels, remoteChannels().map { it.streamId }.toSet(), guideCountries, guideFromProvider)
+            } catch (e: Exception) {
+                "Guide update failed: ${e.message}"
+            }
+            guideBusy = false
+            listVersion++ // rows re-read what's on
+        }
+    }
 
     // ---- Phone remote ---------------------------------------------------------------------
     /** Device name and code to show while a phone is pairing. */

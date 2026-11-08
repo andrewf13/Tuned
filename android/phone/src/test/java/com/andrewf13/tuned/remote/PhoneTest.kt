@@ -26,6 +26,7 @@ import java.io.File
 
 /** A pretend TV speaking the same API as Tuned's RemoteApi. */
 internal class FakeTv : Dispatcher() {
+    var guideMissing = false
     var playing = 101
     val plays = mutableListOf<Int>()
     private val now = System.currentTimeMillis()
@@ -57,18 +58,25 @@ internal class FakeTv : Dispatcher() {
                         """[{"title":"$t","start":${now - 40 * 60_000},"end":${now + 50 * 60_000},"desc":""},{"title":"Post-match","start":${now + 50 * 60_000},"end":${now + 80 * 60_000},"desc":""}]"""
                 })
             }
-            path == "/api/match" -> {
-                val body = request.body.readUtf8()
-                fun c(id: Int, n: String, score: Int) = """{"id":$id,"num":$id,"name":"$n","icon":null,"group":"1","fav":false,"score":$score,"groupName":"Sport"}"""
-                val known = mapOf(
-                    "Fox Cricket|Australia" to c(102, "AU| FOX CRICKET FHD", 125),
-                    "Sky Sports Cricket|United Kingdom" to c(120, "UK: SKY SPORTS CRICKET HD", 125),
-                    "Sky Sport 1|New Zealand" to c(104, "Sky Sport 1 NZ", 125),
-                    "Sky Sports F1|United Kingdom" to c(112, "UK: SKY SPORTS F1 HD", 125),
-                    "Fox Footy|Australia" to c(100, "AU| FOX FOOTY FHD", 125),
+            path == "/api/sports/catalog" -> json(
+                """{"sports":[{"id":"cricket","label":"Cricket","emoji":"🏏"},{"id":"afl","label":"AFL","emoji":"🏉"},{"id":"nrl","label":"NRL & rugby league","emoji":"🏉"},
+                {"id":"rugby","label":"Rugby union","emoji":"🏉"},{"id":"f1","label":"Formula 1","emoji":"🏎️"},{"id":"motogp","label":"MotoGP","emoji":"🏍️"},{"id":"golf","label":"Golf","emoji":"⛳"}]}""",
+            )
+            path == "/api/sports" -> {
+                if (guideMissing) return json("""{"error":"The TV guide hasn't downloaded yet"}""", 409)
+                val replays = request.body.readUtf8().contains("\"replays\":true")
+                fun ch(id: Int, n: String, fav: Boolean = false) = """{"id":$id,"num":$id,"name":"$n","icon":null,"group":"1","fav":$fav,"groupName":"Sport"}"""
+                fun ev(t: String, sub: String?, sport: String, from: Int, to: Int, live: Boolean, replay: Boolean, followed: Boolean, vararg chans: String) =
+                    """{"title":"$t","sub":${sub?.let { "\"$it\"" } ?: "null"},"sport":"$sport","start":${now + from * 60_000L},"end":${now + to * 60_000L},"live":$live,"replay":$replay,"followed":$followed,"channels":[${chans.joinToString(",")}]}"""
+                val events = listOfNotNull(
+                    ev("LIVE: WBBL - Heat v Hurricanes", null, "cricket", -60, 120, true, false, false, ch(102, "AU| FOX CRICKET FHD", true), ch(103, "AU| FOX CRICKET HD")),
+                    ev("FIA Formula One World Championship", "FIA Formula 1: Brazil Grand Prix", "f1", 90, 240, true, false, true, ch(104, "NZ| SKY SPORT 1 HD", true)),
+                    ev("LIVE: MotoGP - Qatar Practice 3", null, "motogp", 300, 360, true, false, false, ch(106, "AU| FOX SPORTS 506 FHD")),
+                    ev("NRL - R13 Knights v Eels", null, "nrl", 26 * 60, 28 * 60, false, false, false, ch(101, "AU| FOX LEAGUE FHD", true)),
+                    ev("Rugby: Nations Championship", "NC: England v Australia", "rugby", 27 * 60, 29 * 60, true, false, false, ch(105, "NZ| SKY SPORT 2 HD")),
+                    if (replays) ev("Test Classic - 1991/92 AUS v IND 4th Test", null, "cricket", 30, 90, false, true, false, ch(102, "AU| FOX CRICKET FHD", true)) else null,
                 )
-                val keys = Regex("\"name\":\"([^\"]+)\",\"country\":\"([^\"]*)\"").findAll(body).map { "${it.groupValues[1]}|${it.groupValues[2]}" }
-                json("""{"matches":{""" + keys.joinToString(",") { k -> "\"$k\":[" + (known[k] ?: "") + "]" } + "}}")
+                json("""{"updated":${now - 3_600_000},"events":[${events.joinToString(",")}]}""")
             }
             path == "/api/state" || path == "/api/play" -> {
                 if (path == "/api/play") { playing = Regex("\\d+").find(request.body.readUtf8())!!.value.toInt(); plays += playing }

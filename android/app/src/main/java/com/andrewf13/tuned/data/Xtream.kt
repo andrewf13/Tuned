@@ -73,6 +73,10 @@ class XtreamClient(private val http: OkHttpClient, val account: Account) {
         return withContext(Dispatchers.Default) { XtreamParse.epg(bytes.decodeToString()) }
     }
 
+    /** The provider's full XMLTV guide. */
+    fun xmltvUrl(): String = "${account.server}/xmltv.php".toHttpUrl().newBuilder()
+        .addQueryParameter("username", account.username).addQueryParameter("password", account.password).build().toString()
+
     /** ext is "ts" or "m3u8". */
     fun liveUrl(streamId: Int, ext: String): String =
         account.server.toHttpUrl().newBuilder()

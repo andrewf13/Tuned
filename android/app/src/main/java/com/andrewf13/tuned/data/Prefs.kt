@@ -139,6 +139,15 @@ class Prefs(private val context: Context) {
         }.getOrDefault(emptyMap())
         set(v) = sp.edit().putString("remoteTokens", JsonObject(v.mapValues { JsonPrimitive(it.value) }).toString()).apply()
 
+    /** Community guide countries from epgshare01 (codes like "AU"). */
+    var guideCountries: Set<String>
+        get() = sp.getStringSet("guideCountries", setOf("AU", "NZ"))!!.toSet()
+        set(v) = sp.edit().putStringSet("guideCountries", v).apply()
+
+    var guideFromProvider: Boolean
+        get() = sp.getBoolean("guideProvider", true)
+        set(v) = sp.edit().putBoolean("guideProvider", v).apply()
+
     /** "small", "normal" or "large". */
     var bufferMode: String
         get() = sp.getString("buffer", "normal")!!

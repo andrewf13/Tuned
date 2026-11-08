@@ -12,8 +12,8 @@ android {
         applicationId = "com.andrewf13.tuned"
         minSdk = 23
         targetSdk = 35
-        versionCode = 8
-        versionName = "0.9.0"
+        versionCode = 9
+        versionName = "1.0.0"
     }
 
     // Release signing key is NOT in this public repo (anyone holding it could ship an "update"
