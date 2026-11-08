@@ -48,6 +48,7 @@ class RemoteController(private val vm: AppViewModel, private val discovery: Remo
     override fun profileName() = onMain { vm.profiles.firstOrNull { it.id == vm.activeProfileId }?.name }
     override fun groups() = onMain { vm.categories.map { it.id to it.name } }
     override fun channels(): List<Channel> = onMain { vm.remoteChannels() }
+    override fun allChannels(): List<Channel> = onMain { vm.channels }
     override fun favourites() = onMain { vm.favourites }
     override fun playing() = onMain { vm.playing }
     override fun groupName(id: String?) = onMain { vm.groupNameFor(id) }

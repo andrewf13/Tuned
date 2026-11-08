@@ -97,6 +97,27 @@ class TvClient(val host: String, val port: Int, var token: String? = null) {
     )
 
     suspend fun state(): TvState = state(call("/api/state"))
+
+    data class Candidate(val channel: TvChannel, val groupName: String, val score: Int)
+
+    /** For each (name, country) broadcaster: the TV's channels that carry it, best first. Key: "name|country". */
+    suspend fun match(broadcasters: List<Pair<String, String>>): Map<String, List<Candidate>> {
+        if (broadcasters.isEmpty()) return emptyMap()
+        val body = JsonObject(
+            mapOf(
+                "broadcasters" to JsonArray(
+                    broadcasters.map { (n, c) -> JsonObject(mapOf("name" to JsonPrimitive(n), "country" to JsonPrimitive(c))) },
+                ),
+            ),
+        )
+        val o = call("/api/match", body)["matches"] as? JsonObject ?: return emptyMap()
+        return o.entries.associate { (k, v) ->
+            k to (v as JsonArray).map {
+                val c = it.jsonObject
+                Candidate(channel(c), c["groupName"]?.jsonPrimitive?.content.orEmpty(), c["score"]?.jsonPrimitive?.int ?: 0)
+            }
+        }
+    }
     suspend fun play(id: Int): TvState = state(call("/api/play", obj("id" to id)))
     suspend fun unpair() { runCatching { call("/api/unpair", JsonObject(emptyMap())) } }
 }

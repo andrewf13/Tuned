@@ -12,14 +12,14 @@ A fast, simple IPTV player for Android TV and Fire TV. Sign in with Xtream Codes
 
 There's **one APK for every device below**: the same file works on all of them.
 
-**[⬇ Download the latest APK](https://github.com/andrewf13/Tuned/raw/main/releases/tuned-latest.apk)** (10 MB, Android 6.0 or newer). Current version **0.7.0** · SHA-256 in [`releases/tuned-0.7.0.apk.sha256`](releases/tuned-0.7.0.apk.sha256)
+**[⬇ Download the latest APK](https://github.com/andrewf13/Tuned/raw/main/releases/tuned-latest.apk)** (10 MB, Android 6.0 or newer). Current version **0.9.0** · SHA-256 in [`releases/tuned-0.9.0.apk.sha256`](releases/tuned-0.9.0.apk.sha256)
 
 **Link to type into Downloader on your TV** (always the newest version):
 ```
 https://github.com/andrewf13/Tuned/raw/main/releases/tuned-latest.apk
 ```
 
-**📱 Phone & tablet remote (optional):** [⬇ Tuned Remote](https://github.com/andrewf13/Tuned/raw/main/releases/tuned-remote-latest.apk) (7 MB, Android 8.0+ phones and tablets). Current version **0.8.0**. See [section 6](#6-phone-remote).
+**📱 Phone & tablet remote (optional):** [⬇ Tuned Remote](https://github.com/andrewf13/Tuned/raw/main/releases/tuned-remote-latest.apk) (7 MB, Android 8.0+ phones and tablets). Current version **0.9.0**, with the **sports guide**. See [section 6](#6-phone-remote).
 
 | Device | Status | Refresh-rate switching | HDR |
 |---|---|---|---|
@@ -204,6 +204,30 @@ Ticking a channel in an unticked group shows the group again, with just your tic
 - To unpair every phone: TV → Settings → **Phone remote** → OK twice.
 - Not found automatically (some routers block discovery)? TV → Settings → Phone remote shows an address like `192.168.1.20:8642`: type it into the phone.
 - The guide on the phone is the same as on the TV: if your provider doesn't send guide data, it says "No guide information".
+
+### Sports guide (in Tuned Remote)
+The **Sports** tab shows your sports, **which channel they're on**, and **tapping a channel changes it on the TV**.
+
+![Sports guide on a phone](docs/sports-phone.png)
+
+1. Open Tuned Remote → **Sports** → **Setup**.
+2. Enter a **[TheSportsDB](https://www.thesportsdb.com) key**. Their premium key (about US$9/month via Patreon) gives a week of TV listings. The free test key **123** shows just one listing per sport per day, enough to try it.
+3. Pick your **sports** (cricket, AFL, rugby, motorsport, NFL, football, tennis, …) and the **countries whose channels your provider carries** (e.g. Australia, NZ, UK, Canada).
+4. Optionally add **keywords** to follow (e.g. *Formula 1, MotoGP, Swans, All Blacks*): matching events get a ★ and show under **★ Followed**.
+
+| On a match | What it does |
+|---|---|
+| A channel showing **▶ your channel's name** | Tap: the TV changes to it |
+| **Not in your channels** | The broadcaster isn't in your provider's list (e.g. a streaming-only service) |
+| **Hold** any channel | Choose the right channel yourself. Remembered, marked *(your pick)*; "Automatic" undoes it |
+
+Events are grouped **Live now / Today / Tomorrow / later**, in your phone's time zone. Matching is done by the TV against **all** your provider's channels (including groups you've unticked), so `TSN 1` finds `CA| TSN1 FHD` and `Sky Sports F1` finds `UK: SKY SPORTS F1 HD`. Numbers must match exactly, and a channel tagged with a different country is never used.
+
+On a tablet the matches fill the screen as cards:
+
+![Sports guide on a tablet](docs/sports-tablet.png)
+
+Sports listings © [TheSportsDB](https://www.thesportsdb.com), used under their API terms. Needs Tuned 0.9 or later on the TV.
 
 ## 7. Backup & restore
 

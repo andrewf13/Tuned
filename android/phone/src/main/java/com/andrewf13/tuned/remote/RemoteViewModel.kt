@@ -57,6 +57,12 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
     val deviceName: String = runCatching { Settings.Global.getString(app.contentResolver, "device_name") }.getOrNull()
         ?: Build.MODEL ?: "Phone"
 
+    /** Sports guide (listings from TheSportsDB, matched to the TV's channels). */
+    var sportsBase = "https://www.thesportsdb.com" // tests point this at a fake server
+    val sports by lazy { com.andrewf13.tuned.remote.sports.SportsController(store, viewModelScope, { client }, ::play, sportsBase) }
+    /** "channels" or "sports" */
+    var tab by mutableStateOf("channels")
+
     init { if (client != null) connect() }
 
     // ---- Finding and pairing -----------------------------------------------------------------

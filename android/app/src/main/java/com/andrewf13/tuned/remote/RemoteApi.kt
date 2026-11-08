@@ -22,6 +22,7 @@ interface RemoteHost {
     fun profileName(): String?
     fun groups(): List<Pair<String, String>>           // id → name, in list order
     fun channels(): List<Channel>                       // everything visible in the TV's list
+    fun allChannels(): List<Channel> = channels()       // every channel the provider has (for sports matching)
     fun favourites(): Set<Int>
     fun playing(): Channel?
     fun groupName(id: String?): String?
@@ -45,6 +46,7 @@ interface RemoteHost {
  *   GET  /api/channels                   → groups and channels in the TV's list  (token)
  *   GET  /api/guide?ids=1,2,3            → now/next for up to 60 channels        (token)
  *   POST /api/play {id}                  → change channel on the TV              (token)
+ *   POST /api/match {broadcasters:[{name,country}]} → best channels for each   (token)
  *
  * Never sends the provider login.
  */
@@ -72,6 +74,7 @@ class RemoteApi(private val host: RemoteHost) {
             req.path == "/api/channels" -> HttpResponse(200, channels().toString())
             req.path == "/api/guide" -> guide(req)
             req.path == "/api/play" && req.method == "POST" -> play(req)
+            req.path == "/api/match" && req.method == "POST" -> match(req)
             req.path == "/api/unpair" && req.method == "POST" -> synchronized(this) { tokens.remove(token); host.saveTokens(tokens); ok("ok" to true) }
             else -> HttpResponse(404, err("Not found"))
         }
@@ -172,9 +175,32 @@ class RemoteApi(private val host: RemoteHost) {
         )
     }
 
+    /**
+     * Sports guide: for each broadcaster in a listing, the provider channels that carry it.
+     * Searches every channel (not just ticked groups); favourites and the ticked list win ties.
+     */
+    private fun match(req: HttpRequest): HttpResponse {
+        val list = (body(req)["broadcasters"] as? JsonArray)?.take(200) ?: return HttpResponse(400, err("Missing broadcasters"))
+        val all = host.allChannels()
+        val preferred = host.channels().map { it.streamId }.toSet() + host.favourites()
+        val favs = host.favourites()
+        val out = list.mapNotNull { el ->
+            val o = el as? JsonObject ?: return@mapNotNull null
+            val name = o["name"]?.jsonPrimitive?.content ?: return@mapNotNull null
+            val country = o["country"]?.jsonPrimitive?.content
+            val key = "$name|${country.orEmpty()}"
+            key to JsonArray(
+                ChannelMatcher.match(name, country, all, preferred).map { m ->
+                    JsonObject(channelJson(m.channel, favs) + ("score" to JsonPrimitive(m.score)) + ("groupName" to JsonPrimitive(host.groupName(m.channel.categoryId) ?: "")))
+                },
+            )
+        }
+        return HttpResponse(200, JsonObject(mapOf("matches" to JsonObject(out.toMap()))).toString())
+    }
+
     private fun play(req: HttpRequest): HttpResponse {
         val id = body(req)["id"]?.jsonPrimitive?.content?.toIntOrNull() ?: return HttpResponse(400, err("Missing id"))
-        if (host.channels().none { it.streamId == id } && host.favourites().none { it == id }) return HttpResponse(404, err("No such channel"))
+        if (host.allChannels().none { it.streamId == id }) return HttpResponse(404, err("No such channel"))
         if (!host.tune(id)) return HttpResponse(409, err("Tuned isn't on screen on the TV"))
         return HttpResponse(200, state().toString())
     }

@@ -57,6 +57,19 @@ internal class FakeTv : Dispatcher() {
                         """[{"title":"$t","start":${now - 40 * 60_000},"end":${now + 50 * 60_000},"desc":""},{"title":"Post-match","start":${now + 50 * 60_000},"end":${now + 80 * 60_000},"desc":""}]"""
                 })
             }
+            path == "/api/match" -> {
+                val body = request.body.readUtf8()
+                fun c(id: Int, n: String, score: Int) = """{"id":$id,"num":$id,"name":"$n","icon":null,"group":"1","fav":false,"score":$score,"groupName":"Sport"}"""
+                val known = mapOf(
+                    "Fox Cricket|Australia" to c(102, "AU| FOX CRICKET FHD", 125),
+                    "Sky Sports Cricket|United Kingdom" to c(120, "UK: SKY SPORTS CRICKET HD", 125),
+                    "Sky Sport 1|New Zealand" to c(104, "Sky Sport 1 NZ", 125),
+                    "Sky Sports F1|United Kingdom" to c(112, "UK: SKY SPORTS F1 HD", 125),
+                    "Fox Footy|Australia" to c(100, "AU| FOX FOOTY FHD", 125),
+                )
+                val keys = Regex("\"name\":\"([^\"]+)\",\"country\":\"([^\"]*)\"").findAll(body).map { "${it.groupValues[1]}|${it.groupValues[2]}" }
+                json("""{"matches":{""" + keys.joinToString(",") { k -> "\"$k\":[" + (known[k] ?: "") + "]" } + "}}")
+            }
             path == "/api/state" || path == "/api/play" -> {
                 if (path == "/api/play") { playing = Regex("\\d+").find(request.body.readUtf8())!!.value.toInt(); plays += playing }
                 json("""{"name":"Tuned on SHIELD Android TV","profile":"My provider","playing":{"id":$playing,"num":2,"name":"${if (playing == 101) "Fox League HD" else "Sky Sport 1 NZ"}","icon":null,"group":"1","fav":true}}""")

@@ -38,6 +38,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -188,7 +190,13 @@ fun ChannelsScreen(vm: RemoteViewModel) {
         Column(Modifier.fillMaxSize().padding(pad)) {
             if (menu) MenuCard(vm) { menu = false }
             vm.problem?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
-            if (wide) {
+            PrimaryTabRow(selectedTabIndex = if (vm.tab == "sports") 1 else 0) {
+                Tab(vm.tab == "channels", { vm.tab = "channels" }, text = { Text("Channels") })
+                Tab(vm.tab == "sports", { vm.tab = "sports" }, text = { Text("Sports") })
+            }
+            if (vm.tab == "sports") {
+                com.andrewf13.tuned.remote.sports.SportsTab(vm)
+            } else if (wide) {
                 Row(Modifier.fillMaxSize()) {
                     GroupPane(vm, Modifier.width(280.dp).fillMaxHeight())
                     Column(Modifier.weight(1f)) {
