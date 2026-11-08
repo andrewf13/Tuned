@@ -20,6 +20,7 @@ import com.andrewf13.tuned.ui.LoadingScreen
 import com.andrewf13.tuned.ui.LoginScreen
 import com.andrewf13.tuned.ui.BackupScreen
 import com.andrewf13.tuned.ui.ExitDialog
+import com.andrewf13.tuned.ui.PairDialog
 import com.andrewf13.tuned.ui.GroupChannelsScreen
 import com.andrewf13.tuned.ui.GroupsScreen
 import com.andrewf13.tuned.ui.PlayerOverlay
@@ -32,12 +33,15 @@ class MainActivity : ComponentActivity() {
     private val vm: AppViewModel by viewModels()
     private lateinit var player: PlayerController
     private lateinit var matcher: RefreshRateMatcher
+    lateinit var remote: com.andrewf13.tuned.remote.RemoteController
+        private set
     private var stopped = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         player = PlayerController(this)
         matcher = RefreshRateMatcher(this)
+        remote = com.andrewf13.tuned.remote.RemoteController(vm, com.andrewf13.tuned.remote.RemoteDiscovery(this))
         com.andrewf13.tuned.ui.Palette.theme = com.andrewf13.tuned.ui.Themes.byId(vm.prefs.themeId)
         setContent { TunedTheme { App() } }
     }
@@ -48,6 +52,7 @@ class MainActivity : ComponentActivity() {
         LaunchedEffect(vm.bufferMode) { player.setBufferMode(vm.bufferMode) }
         val showVideo = vm.playing != null && (vm.screen == Screen.Home || vm.screen == Screen.Player)
         if (exitPrompt) ExitDialog(onExit = ::exitApp, onStay = { exitPrompt = false })
+        vm.pairing?.let { (device, code) -> PairDialog(device, code, onCancel = { vm.pairing = null }) }
         Box(Modifier.fillMaxSize()) {
             // Same slot in both screens, so the channel keeps playing between them.
             if (showVideo) VideoLayer(vm, player, matcher)
@@ -56,7 +61,7 @@ class MainActivity : ComponentActivity() {
                 Screen.Loading -> LoadingScreen()
                 Screen.Home -> HomeScreen(vm)
                 Screen.Player -> PlayerOverlay(vm, player, matcher)
-                Screen.Settings -> SettingsScreen(vm, matcher, onExit = ::exitApp)
+                Screen.Settings -> SettingsScreen(vm, matcher, onExit = ::exitApp, onForgetPhones = remote::forgetPhones)
                 Screen.Groups -> GroupsScreen(vm)
                 Screen.GroupChannels -> GroupChannelsScreen(vm)
                 Screen.Backup -> BackupScreen(vm, onBack = vm::closeBackup)
@@ -95,12 +100,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        remote.start() // phone remote works while Tuned is on screen
         if (stopped && vm.playing != null && (vm.screen == Screen.Player || vm.screen == Screen.Home)) player.resume()
         stopped = false
     }
 
     override fun onStop() {
         super.onStop()
+        remote.stop()
         stopped = true
         player.stop()
         matcher.reset()

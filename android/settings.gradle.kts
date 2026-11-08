@@ -18,3 +18,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Tuned"
 include(":app")
+include(":phone") // Tuned Remote: the phone companion

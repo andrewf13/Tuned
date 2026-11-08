@@ -12,12 +12,14 @@ A fast, simple IPTV player for Android TV and Fire TV. Sign in with Xtream Codes
 
 There's **one APK for every device below**: the same file works on all of them.
 
-**[⬇ Download the latest APK](https://github.com/andrewf13/Tuned/raw/main/releases/tuned-latest.apk)** (10 MB, Android 6.0 or newer). Current version **0.6.0** · SHA-256 in [`releases/tuned-0.6.0.apk.sha256`](releases/tuned-0.6.0.apk.sha256)
+**[⬇ Download the latest APK](https://github.com/andrewf13/Tuned/raw/main/releases/tuned-latest.apk)** (10 MB, Android 6.0 or newer). Current version **0.7.0** · SHA-256 in [`releases/tuned-0.7.0.apk.sha256`](releases/tuned-0.7.0.apk.sha256)
 
 **Link to type into Downloader on your TV** (always the newest version):
 ```
 https://github.com/andrewf13/Tuned/raw/main/releases/tuned-latest.apk
 ```
+
+**📱 Phone remote (optional):** [⬇ Tuned Remote for Android phones](https://github.com/andrewf13/Tuned/raw/main/releases/tuned-remote-latest.apk) (7 MB, Android 8.0+). See [section 6](#6-phone-remote).
 
 | Device | Status | Refresh-rate switching | HDR |
 |---|---|---|---|
@@ -65,7 +67,7 @@ Install the newer APK over the top the same way. Your login, favourites and sett
 ## 3. First run
 1. Open **Tuned** from your apps row.
 2. Choose **Xtream Codes** and enter your **server** (e.g. `http://example.com:8080`), **username** and **password**. A full `get.php?username=…&password=…` link in the Server box also works. Or choose **M3U playlist** and enter the playlist link (for providers without Xtream Codes).
-3. Already have a backup? Press **Restore from a backup instead** (see section 6).
+3. Already have a backup? Press **Restore from a backup instead** (see section 7).
 4. Press **Groups** and choose the groups you actually watch. Providers often have hundreds.
 
 ---
@@ -95,6 +97,7 @@ While a channel plays, the groups column folds away so you can see the picture. 
 | **OK** | Info bar + your **last 10 channels** (⬅ ➡ to pick, OK to watch, ⬆ or Back to close) |
 | **Hold OK** or **Menu** | Favourite this channel |
 | **Back** | Channel list (the channel **keeps playing**) |
+| | The **time** shows top right whenever the info bar, recents or channel list is on screen |
 | **Hold Back** | "Exit Tuned?" |
 
 ![Info bar and recent channels](docs/full-screen-recents.png)
@@ -168,7 +171,32 @@ Ticking a channel in an unticked group shows the group again, with just your tic
 
 ---
 
-## 6. Backup & restore
+## 6. Phone remote
+
+**Tuned Remote** is a companion app for your Android phone (made on a Galaxy S25). It shows the TV's channel list with what's on now and next, and **tapping a channel changes it on the TV**.
+
+![Tuned Remote on a phone](docs/phone-remote.png)
+
+1. On the phone, open the [Tuned Remote download](https://github.com/andrewf13/Tuned/raw/main/releases/tuned-remote-latest.apk) and install it (allow your browser to install apps when asked).
+2. Open **Tuned on the TV**. The phone and TV must be on the same Wi-Fi.
+3. Open **Tuned Remote**: the TV appears in the list. Tap it.
+4. A **4-digit code** appears on the TV. Type it on the phone. Done: the phone remembers the TV.
+
+| On the phone | What it does |
+|---|---|
+| **★ Favourites / All / group chips** | Show the same lists as the TV |
+| **Search** | Find any channel in the TV's list |
+| **Tap a channel** | Changes channel on the TV (it goes full screen) |
+| Top bar | What's on the TV right now |
+| ⋮ → **Forget this TV** | Unpair |
+
+- The phone works while **Tuned is open on the TV**. If the TV is on its home screen, open Tuned first.
+- The phone never receives your provider login, only channel names, logos and the guide. Only phones that entered a code on the TV can change channels.
+- To unpair every phone: TV → Settings → **Phone remote** → OK twice.
+- Not found automatically (some routers block discovery)? TV → Settings → Phone remote shows an address like `192.168.1.20:8642`: type it into the phone.
+- The guide on the phone is the same as on the TV: if your provider doesn't send guide data, it says "No guide information".
+
+## 7. Backup & restore
 
 ![Backup](docs/backup.png)
 
@@ -181,7 +209,7 @@ A backup holds **every profile** (logins and playlist links) with each one's **f
 
 ---
 
-## 7. Troubleshooting
+## 8. Troubleshooting
 
 | Problem | Try |
 |---|---|
@@ -191,6 +219,7 @@ A backup holds **every profile** (logins and playlist links) with each one's **f
 | TV doesn't switch refresh rate | Check the device setting in section 2. Info bar should show `50 fps · TV 50 Hz` |
 | Picture isn't HDR | Use a 4K HDR channel and check your TV's input supports HDR (e.g. Sony "Enhanced format") |
 | Quiet channel | Settings → Volume boost |
+| Phone can't find the TV | Tuned must be open on the TV, same Wi-Fi. Or type the address from TV Settings → Phone remote |
 | No "what's on" text | Your provider doesn't send guide data for that channel |
 
 ---

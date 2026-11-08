@@ -215,6 +215,8 @@ fun PlayerOverlay(vm: AppViewModel, player: PlayerController, matcher: RefreshRa
                 }
             }
         }
+        // The time, top right, whenever anything is on screen over the picture.
+        if (panel != Panel.None) Clock(Modifier.align(Alignment.TopEnd).padding(top = 28.dp, end = 40.dp))
         if (panel == Panel.List) {
             ChannelListOverlay(
                 vm, current = channel,
@@ -440,5 +442,18 @@ private fun StallIndicator(vm: AppViewModel, player: PlayerController, error: St
                 color = Palette.muted, style = MaterialTheme.typography.bodySmall,
             )
         }
+    }
+}
+
+@Composable
+private fun Clock(modifier: Modifier) {
+    val time by androidx.compose.runtime.produceState(hm(System.currentTimeMillis())) {
+        while (true) {
+            value = hm(System.currentTimeMillis())
+            delay(60_000 - System.currentTimeMillis() % 60_000) // tick on the minute
+        }
+    }
+    Box(modifier.clip(RoundedCornerShape(12.dp)).background(Palette.panel.copy(alpha = 0.86f)).padding(horizontal = 18.dp, vertical = 8.dp)) {
+        Text(time, color = Palette.text, style = MaterialTheme.typography.headlineSmall)
     }
 }

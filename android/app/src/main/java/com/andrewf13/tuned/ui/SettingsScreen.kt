@@ -32,7 +32,7 @@ import java.text.DateFormat
 import java.util.Date
 
 @Composable
-fun SettingsScreen(vm: AppViewModel, matcher: RefreshRateMatcher, onExit: () -> Unit = {}) {
+fun SettingsScreen(vm: AppViewModel, matcher: RefreshRateMatcher, onExit: () -> Unit = {}, onForgetPhones: () -> Unit = {}) {
     BackHandler { vm.backToHome() }
     val account by produceState<AccountInfo?>(null) { value = vm.accountInfo() }
     val first = remember { FocusRequester() }
@@ -55,6 +55,17 @@ fun SettingsScreen(vm: AppViewModel, matcher: RefreshRateMatcher, onExit: () -> 
                     "Switches the TV to 23.976 / 24 / 50 / 59.94 Hz to suit each channel. On the Shield, also turn on " +
                         "Settings → Display & Sound → Advanced → Match content frame rate.",
                     onClick = vm::toggleAfr,
+                )
+            }
+            item {
+                var confirm by remember { mutableStateOf(false) }
+                SettingRow(
+                    "Phone remote",
+                    if (confirm) "OK again to forget" else if (vm.pairedPhones == 0) "No phones" else "${vm.pairedPhones} paired",
+                    "Install Tuned Remote on your phone, open it on the same Wi-Fi and pick this TV: a code appears here to pair it. " +
+                        (vm.remoteAddress?.let { "If it doesn't find the TV, enter $it. " } ?: "") +
+                        if (vm.pairedPhones > 0) "OK twice to forget all paired phones." else "",
+                    onClick = { if (vm.pairedPhones == 0) Unit else if (confirm) { onForgetPhones(); confirm = false } else confirm = true },
                 )
             }
             item {

@@ -132,6 +132,13 @@ class Prefs(private val context: Context) {
         get() = sp.getInt("boostDb", 6)
         set(v) = sp.edit().putInt("boostDb", v).apply()
 
+    /** Paired phones: token → device name. */
+    var remoteTokens: Map<String, String>
+        get() = runCatching {
+            XtreamParse.json.parseToJsonElement(sp.getString("remoteTokens", "{}")!!).jsonObject.mapValues { it.value.jsonPrimitive.content }
+        }.getOrDefault(emptyMap())
+        set(v) = sp.edit().putString("remoteTokens", JsonObject(v.mapValues { JsonPrimitive(it.value) }).toString()).apply()
+
     /** "small", "normal" or "large". */
     var bufferMode: String
         get() = sp.getString("buffer", "normal")!!

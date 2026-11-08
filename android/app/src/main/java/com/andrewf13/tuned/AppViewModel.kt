@@ -385,6 +385,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     suspend fun accountInfo(): AccountInfo? = runCatching { repo.client?.authenticate() }.getOrNull()
 
+    // ---- Phone remote ---------------------------------------------------------------------
+    /** Device name and code to show while a phone is pairing. */
+    var pairing by mutableStateOf<Pair<String, String>?>(null)
+    var remoteAddress by mutableStateOf<String?>(null)
+    var pairedPhones by mutableIntStateOf(0)
+
+    /** Change channel from the phone: tune and show it full screen. */
+    fun tuneFromRemote(id: Int): Boolean {
+        val c = channels.firstOrNull { it.streamId == id } ?: return false
+        if (screen == Screen.Login || screen == Screen.Loading) return false
+        tune(c)
+        screen = Screen.Player
+        return true
+    }
+
+    fun groupNameFor(id: String?): String? = allCategories.firstOrNull { it.id == id }?.name
+
+    /** What the phone sees: the TV's own list (ticked groups and channels), plus favourites. */
+    fun remoteChannels(): List<Channel> {
+        val favs = channelsFor("fav")
+        val seen = HashSet<Int>()
+        return (favs + allVisible).filter { seen.add(it.streamId) }
+    }
+
     // ---- Profiles -------------------------------------------------------------------------
     fun openProfiles() { screen = Screen.Profiles }
     fun addProfile() { editingProfile = null; screen = Screen.Login }
