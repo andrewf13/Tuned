@@ -92,7 +92,7 @@ fun GroupChannelsScreen(vm: AppViewModel) {
         } else {
             LazyVerticalGrid(
                 state = gridState,
-                columns = GridCells.Fixed(3),
+                columns = GridCells.Fixed(2), // wide cells: channel names are long
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
@@ -107,10 +107,10 @@ fun GroupChannelsScreen(vm: AppViewModel) {
                             if (on) Text("✓", color = Palette.accent, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         }
                         AsyncImage(model = c.icon, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.size(width = 40.dp, height = 26.dp))
-                        Text(
-                            c.name, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                        MarqueeText(
+                            c.name, modifier = Modifier.weight(1f),
                             fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
-                            color = if (on) androidx.tv.material3.LocalContentColor.current else mutedColor(),
+                            color = if (on || LocalCardFocused.current) androidx.tv.material3.LocalContentColor.current else mutedColor(),
                         )
                         if (c.streamId in vm.favourites) Text("★", color = Palette.fav)
                     }

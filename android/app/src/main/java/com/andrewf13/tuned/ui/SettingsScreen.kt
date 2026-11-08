@@ -16,6 +16,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -41,10 +44,17 @@ fun SettingsScreen(vm: AppViewModel, matcher: RefreshRateMatcher, onExit: () -> 
         LazyColumn(Modifier.width(820.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             item {
                 SettingRow(
+                    "Profile", vm.profiles.firstOrNull { it.id == vm.activeProfileId }?.name ?: "",
+                    "Switch provider, edit a login, or add another Xtream Codes account or M3U playlist.",
+                    Modifier.focusRequester(first), vm::openProfiles,
+                )
+            }
+            item {
+                SettingRow(
                     "Match frame rate", if (vm.afrEnabled) "On" else "Off",
                     "Switches the TV to 23.976 / 24 / 50 / 59.94 Hz to suit each channel. On the Shield, also turn on " +
                         "Settings → Display & Sound → Advanced → Match content frame rate.",
-                    Modifier.focusRequester(first), vm::toggleAfr,
+                    onClick = vm::toggleAfr,
                 )
             }
             item {
@@ -59,6 +69,38 @@ fun SettingsScreen(vm: AppViewModel, matcher: RefreshRateMatcher, onExit: () -> 
                     "Stream format", if (vm.streamFormat == "ts") "MPEG-TS" else "HLS",
                     "MPEG-TS usually starts fastest. Try HLS if a channel won't play.",
                     onClick = vm::toggleFormat,
+                )
+            }
+            item {
+                SettingRow(
+                    "Buffer size",
+                    when (vm.bufferMode) { "small" -> "Small"; "large" -> "Large"; else -> "Normal" },
+                    when (vm.bufferMode) {
+                        "small" -> "Quickest channel changes. Best on a fast, steady connection."
+                        "large" -> "Holds up to 2 minutes and waits a little longer before starting. Rides out a shaky connection."
+                        else -> "Balanced: starts in about a second, holds up to 50 seconds."
+                    },
+                    onClick = vm::cycleBuffer,
+                )
+            }
+            item {
+                var result by remember { mutableStateOf<com.andrewf13.tuned.data.Diagnosis?>(null) }
+                var running by remember { mutableStateOf(false) }
+                val scope = rememberCoroutineScope()
+                SettingRow(
+                    "Test connection", if (running) "Testing…" else result?.headline ?: "",
+                    result?.let {
+                        "Internet: " + (if (it.internet.ok) "${it.internet.ms} ms" else "not reachable") +
+                            "  ·  Provider: " + (if (it.provider.ok) "${it.provider.ms} ms" else "not responding (${it.provider.detail})") +
+                            "\n" + it.advice
+                    } ?: "Checks your internet and your provider's server, and tells you which one is the problem.",
+                    onClick = {
+                        if (!running) scope.launch {
+                            running = true
+                            result = vm.doctor.diagnose(vm.repo.profile, vm.repo.client, null)
+                            running = false
+                        }
+                    },
                 )
             }
             item {
@@ -88,7 +130,7 @@ fun SettingsScreen(vm: AppViewModel, matcher: RefreshRateMatcher, onExit: () -> 
             }
             item { SettingRow("Backup & restore", "", "Save your login, favourites and settings to an encrypted file, or restore one.", onClick = vm::openBackup) }
             item { SettingRow("Exit Tuned", "", "Stops playback and closes the app. Holding Back anywhere does the same.", onClick = onExit) }
-            item { SettingRow("Sign out", "", "Removes your login and saved channel list from this device.", onClick = vm::signOut) }
+
 
             item { Section("Account") }
             item {

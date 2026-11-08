@@ -21,6 +21,8 @@ echo "sdk.dir=/path/to/android-sdk" > local.properties
 ## Layout
 - `data/`: Xtream API client and lenient parsing, cached channel list, now/next EPG cache, preferences
 - `player/`: Media3 setup, frame-rate measurement, display-mode choice (`FrameRates`, unit-tested), `RefreshRateMatcher`
+- `data/M3u.kt`: M3U/M3U8 playlist parser · `data/NetworkDoctor.kt`: internet / provider / account checks for the buffering panel
+- `data/Prefs.kt`: app settings, profiles, and per-profile state (favourites, groups, recents)
 - `data/Backup*.kt`: backup contents, passphrase encryption (PBKDF2 → AES-256-GCM), Download/Tuned storage
 - `ui/`: Login, Home (groups + channels over live video), Player (info bar, recents, channel list), Groups, channels-in-a-group, Settings, Backup, themes
 

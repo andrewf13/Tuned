@@ -1,0 +1,11 @@
+Tuned
+Copyright 2026 Andrew Fisher
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+It includes software from these open-source projects, all under the Apache License 2.0:
+- AndroidX, Jetpack Compose and Compose for TV (The Android Open Source Project)
+- Media3 / ExoPlayer (The Android Open Source Project)
+- OkHttp (Square, Inc.)
+- Coil (Coil Contributors)
+- kotlinx.coroutines and kotlinx.serialization (JetBrains s.r.o. and contributors)

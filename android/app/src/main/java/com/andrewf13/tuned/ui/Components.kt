@@ -8,7 +8,16 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -28,10 +37,13 @@ fun FocusCard(
     selected: Boolean = false,
     content: @Composable RowScope.() -> Unit,
 ) {
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
     Surface(
         onClick = onClick,
         onLongClick = onLongClick,
         modifier = modifier,
+        interactionSource = interaction,
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(10.dp)),
         colors = ClickableSurfaceDefaults.colors(
             containerColor = if (selected) Palette.panelHi else Color.Transparent,
@@ -43,13 +55,39 @@ fun FocusCard(
         ),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.0f),
     ) {
-        Row(
-            Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            content = content,
-        )
+        CompositionLocalProvider(LocalCardFocused provides focused) {
+            Row(
+                Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                content = content,
+            )
+        }
     }
+}
+
+/** True inside a [FocusCard] that has focus. */
+val LocalCardFocused = compositionLocalOf { false }
+
+/**
+ * One line of text: cut off with "…" at rest, scrolling sideways when its card is focused,
+ * so long channel names can be read in full.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun MarqueeText(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = Color.Unspecified,
+    style: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.bodyLarge,
+    fontWeight: androidx.compose.ui.text.font.FontWeight? = null,
+) {
+    val focused = LocalCardFocused.current
+    Text(
+        text, color = color, style = style, fontWeight = fontWeight, maxLines = 1,
+        overflow = if (focused) TextOverflow.Clip else TextOverflow.Ellipsis,
+        modifier = if (focused) modifier.basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 700, velocity = 40.dp) else modifier,
+    )
 }
 
 /** Secondary text that stays readable on both the dark rest state and the light focus state. */

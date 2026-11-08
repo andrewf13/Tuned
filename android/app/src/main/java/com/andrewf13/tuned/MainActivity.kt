@@ -23,6 +23,7 @@ import com.andrewf13.tuned.ui.ExitDialog
 import com.andrewf13.tuned.ui.GroupChannelsScreen
 import com.andrewf13.tuned.ui.GroupsScreen
 import com.andrewf13.tuned.ui.PlayerOverlay
+import com.andrewf13.tuned.ui.ProfilesScreen
 import com.andrewf13.tuned.ui.VideoLayer
 import com.andrewf13.tuned.ui.SettingsScreen
 import com.andrewf13.tuned.ui.TunedTheme
@@ -44,6 +45,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun App() {
         LaunchedEffect(vm.volumeBoostDb) { player.setBoostDb(vm.volumeBoostDb) }
+        LaunchedEffect(vm.bufferMode) { player.setBufferMode(vm.bufferMode) }
         val showVideo = vm.playing != null && (vm.screen == Screen.Home || vm.screen == Screen.Player)
         if (exitPrompt) ExitDialog(onExit = ::exitApp, onStay = { exitPrompt = false })
         Box(Modifier.fillMaxSize()) {
@@ -58,6 +60,7 @@ class MainActivity : ComponentActivity() {
                 Screen.Groups -> GroupsScreen(vm)
                 Screen.GroupChannels -> GroupChannelsScreen(vm)
                 Screen.Backup -> BackupScreen(vm, onBack = vm::closeBackup)
+                Screen.Profiles -> ProfilesScreen(vm)
             }
         }
     }

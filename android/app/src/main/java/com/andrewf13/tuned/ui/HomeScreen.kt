@@ -172,7 +172,7 @@ private fun CategoryRail(vm: AppViewModel, selectedFocus: FocusRequester, modifi
                     .then(if (selected) Modifier.focusRequester(selectedFocus) else Modifier)
                     .onFocusChanged { if (it.isFocused) vm.selectCategory(item.key) },
             ) {
-                Text(item.label, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                MarqueeText(item.label, modifier = Modifier.weight(1f))
                 item.count?.let { Text("$it", color = mutedColor(), style = MaterialTheme.typography.bodySmall) }
             }
         }

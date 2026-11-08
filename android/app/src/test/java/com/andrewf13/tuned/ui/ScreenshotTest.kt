@@ -7,7 +7,6 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.core.app.ApplicationProvider
 import android.app.Application
 import com.andrewf13.tuned.AppViewModel
-import com.andrewf13.tuned.data.Account
 import com.andrewf13.tuned.data.Prefs
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -58,12 +57,15 @@ class ScreenshotTest {
             names.mapIndexed { i, (n, c) -> """{"num":${i + 1},"name":"$n","stream_id":${100 + i},"category_id":"$c","stream_icon":""}""" }
                 .joinToString(",", "[", "]"),
         )
+        // Seed the way a single-login version (0.1–0.5) stored things, so every test also
+        // exercises the upgrade into the "default" profile.
+        app.getSharedPreferences("tuned", 0).edit().clear()
+            .putString("server", "http://127.0.0.1:9").putString("user", "demo").putString("pass", "demo").commit()
         Prefs(app).apply {
-            account = Account("http://127.0.0.1:9", "demo", "demo")
-            favourites = setOf(100, 101, 104)
+            current.favourites = setOf(100, 101, 104)
             resumeOnStart = false
-            lastStreamId = 102
-            recents = listOf(102, 100, 104, 110, 106)
+            current.lastStreamId = 102
+            current.recents = listOf(102, 100, 104, 110, 106)
         }
         return AppViewModel(app)
     }
@@ -95,7 +97,7 @@ class ScreenshotTest {
 
     @Test fun login() {
         val app = ApplicationProvider.getApplicationContext<Application>()
-        Prefs(app).account = null
+        app.getSharedPreferences("tuned", 0).edit().clear().commit()
         val vm = AppViewModel(app)
         compose.setContent { TunedTheme { LoginScreen(vm) } }
         shot("login")
@@ -278,13 +280,13 @@ class ScreenshotTest {
             com.andrewf13.tuned.data.Backup.export(prefs), "pass-1234".toCharArray(),
         )
         app.getSharedPreferences("tuned", 0).edit().clear().commit()
-        assertEquals(null, Prefs(app).account)
+        assertEquals(null, Prefs(app).activeProfile)
         val plain = com.andrewf13.tuned.data.BackupCrypto.decrypt(enc, "pass-1234".toCharArray())
         com.andrewf13.tuned.data.Backup.import(plain, Prefs(app))
         val back = Prefs(app)
-        assertEquals("demo", back.account?.username)
-        assertEquals(setOf(100, 101, 104), back.favourites)
-        assertEquals(setOf("2"), back.visibleGroups)
+        assertEquals("demo", back.activeProfile?.username)
+        assertEquals(setOf(100, 101, 104), back.current.favourites)
+        assertEquals(setOf("2"), back.current.visibleGroups)
         assertEquals(true, back.sortAlpha)
         assertEquals("green", back.themeId)
         compose.runOnUiThread { Palette.theme = Themes.Blue }
@@ -328,5 +330,62 @@ class ScreenshotTest {
         compose.runOnUiThread { vm.toggleChannel(101, "1") }
         compose.setContent { TunedTheme { GroupsScreen(vm) } }
         shot("groups-with-channels")
+    }
+
+    @Test fun upgradeKeepsLoginAndFavourites() {
+        val vm = seededVm()
+        waitLoaded(vm)
+        val prefs = Prefs(ApplicationProvider.getApplicationContext())
+        assertEquals(1, prefs.profiles.size)
+        assertEquals("default", prefs.activeProfileId)
+        assertEquals("demo", prefs.activeProfile?.username)
+        assertEquals(setOf(100, 101, 104), vm.favourites)
+        assertEquals(15, vm.channels.size) // read from the old cache files
+    }
+
+    /** Each profile keeps its own favourites; switching back restores them. */
+    @Test fun profilesKeepTheirOwnState() {
+        val vm = seededVm()
+        waitLoaded(vm)
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val playlist = File(app.filesDir, "lineup_m3u1_playlist.m3u")
+        playlist.writeText(
+            "#EXTM3U\n#EXTINF:-1 tvg-logo=\"\" group-title=\"Rugby\",Sky Sport 1 NZ\nhttp://x/1.ts\n" +
+                "#EXTINF:-1 group-title=\"Rugby\",Sky Sport 2 NZ\nhttp://x/2.ts\n",
+        )
+        compose.runOnUiThread {
+            Prefs(app).upsertProfile(com.andrewf13.tuned.data.Profile("m3u1", "NZ playlist", com.andrewf13.tuned.data.SourceType.M3U, m3uUrl = "http://127.0.0.1:9/p.m3u"))
+            vm.switchProfile("m3u1")
+        }
+        waitLoaded(vm)
+        assertEquals(listOf("Sky Sport 1 NZ", "Sky Sport 2 NZ"), vm.channels.map { it.name })
+        assertTrue(vm.favourites.isEmpty())
+        compose.runOnUiThread { vm.toggleFavourite(vm.channels[0].streamId); vm.switchProfile("default") }
+        waitLoaded(vm)
+        assertEquals(setOf(100, 101, 104), vm.favourites)
+        assertEquals(2, vm.profiles.size)
+        compose.runOnUiThread { vm.openProfiles() }
+        compose.setContent { TunedTheme { ProfilesScreen(vm) } }
+        shot("profiles")
+    }
+
+    @Test fun profileForm() {
+        val vm = seededVm()
+        waitLoaded(vm)
+        compose.runOnUiThread { vm.addProfile() }
+        compose.setContent { TunedTheme { LoginScreen(vm) } }
+        shot("profile-add")
+    }
+
+    @Test fun backupV1StillRestores() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        app.getSharedPreferences("tuned", 0).edit().clear().commit()
+        val v1 = """{"app":"tuned","account":{"server":"http://s:80","username":"u","password":"p"},
+            "favourites":[5,6],"visibleGroups":["9"],"recents":[5],"settings":{"theme":"aurora"}}"""
+        com.andrewf13.tuned.data.Backup.import(v1.toByteArray(), Prefs(app))
+        val p = Prefs(app)
+        assertEquals("u", p.activeProfile?.username)
+        assertEquals(setOf(5, 6), p.current.favourites)
+        assertEquals("aurora", p.themeId)
     }
 }

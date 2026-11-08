@@ -26,6 +26,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
+import androidx.compose.runtime.mutableStateOf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.util.concurrent.atomic.AtomicLong
@@ -47,7 +48,25 @@ class PlayerController(context: Context) {
 
     private val main = Handler(Looper.getMainLooper())
 
-    val exo: ExoPlayer
+    /** Replaced (not mutated) when the buffer size changes, so the video view re-binds to it. */
+    private val exoState = mutableStateOf<ExoPlayer?>(null)
+    val exo: ExoPlayer get() = exoState.value!!
+    private val appContext = context.applicationContext
+    private var bufferMode = "normal"
+    private var stopped = true
+
+    /** When the current stall began (elapsedRealtime), or null while playing smoothly. */
+    private val _stallSince = MutableStateFlow<Long?>(null)
+    val stallSince: StateFlow<Long?> = _stallSince
+    private var hadReady = false
+    private val rebuffers = ArrayDeque<Long>()
+
+    /** Times playback stalled mid-stream in the last 10 minutes (not counting channel starts). */
+    fun rebuffersRecently(): Int {
+        val cutoff = SystemClock.elapsedRealtime() - 10 * 60_000
+        while (rebuffers.isNotEmpty() && rebuffers.first() < cutoff) rebuffers.removeFirst()
+        return rebuffers.size
+    }
 
     private val _info = MutableStateFlow(StreamInfo())
     val info: StateFlow<StreamInfo> = _info
@@ -87,7 +106,10 @@ class PlayerController(context: Context) {
         (context.getSystemService(Context.AUDIO_SERVICE) as AudioManager).generateAudioSessionId()
     private val loudness: LoudnessEnhancer? = runCatching { LoudnessEnhancer(audioSessionId) }.getOrNull()
 
-    init {
+    init { exoState.value = build("normal") }
+
+    private fun build(mode: String): ExoPlayer {
+        bufferMode = mode
         val http = DefaultHttpDataSource.Factory()
             .setTransferListener(meter)
             .setAllowCrossProtocolRedirects(true)
@@ -97,43 +119,65 @@ class PlayerController(context: Context) {
             DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or
                 DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS,
         )
-        val renderers = DefaultRenderersFactory(context).setEnableDecoderFallback(true)
-        // Small start buffer so channel changes feel quick.
-        val load = DefaultLoadControl.Builder().setBufferDurationsMs(15_000, 50_000, 1_000, 2_000).build()
+        val renderers = DefaultRenderersFactory(appContext).setEnableDecoderFallback(true)
+        // min buffer, max buffer, needed to start, needed to resume after a stall (ms)
+        val (minB, maxB, start, resume) = when (mode) {
+            "small" -> listOf(4_000, 15_000, 500, 1_500)   // quickest channel changes
+            "large" -> listOf(30_000, 120_000, 2_500, 5_000) // rides out a shaky connection
+            else -> listOf(15_000, 50_000, 1_000, 2_000)
+        }
+        val load = DefaultLoadControl.Builder().setBufferDurationsMs(minB, maxB, start, resume).build()
 
-        exo = ExoPlayer.Builder(context, renderers)
+        val p = ExoPlayer.Builder(appContext, renderers)
             .setMediaSourceFactory(DefaultMediaSourceFactory(http, extractors))
             .setLoadControl(load)
             .build()
         // We switch the display ourselves; don't let ExoPlayer ask for "seamless only".
-        exo.videoChangeFrameRateStrategy = C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF
-        exo.playWhenReady = true
-        exo.audioSessionId = audioSessionId
+        p.videoChangeFrameRateStrategy = C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF
+        p.playWhenReady = true
+        p.audioSessionId = audioSessionId
 
-        exo.addListener(object : Player.Listener {
+        p.addListener(object : Player.Listener {
             override fun onTracksChanged(tracks: Tracks) = updateInfo()
             override fun onVideoSizeChanged(videoSize: VideoSize) = updateInfo()
             override fun onPlaybackStateChanged(state: Int) {
                 _buffering.value = state == Player.STATE_BUFFERING
                 when (state) {
-                    Player.STATE_READY -> { retries = 0; _error.value = null }
+                    Player.STATE_BUFFERING -> {
+                        if (_stallSince.value == null) _stallSince.value = SystemClock.elapsedRealtime()
+                        if (hadReady) rebuffers.addLast(SystemClock.elapsedRealtime())
+                    }
+                    Player.STATE_READY -> { retries = 0; _error.value = null; hadReady = true; _stallSince.value = null }
                     // A live stream "ending" means the provider dropped us: reconnect.
                     Player.STATE_ENDED -> retry()
+                    else -> {}
                 }
             }
             override fun onPlayerError(error: PlaybackException) {
                 if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
-                    exo.seekToDefaultPosition(); exo.prepare(); return
+                    p.seekToDefaultPosition(); p.prepare(); return
                 }
                 if (!retry()) _error.value = describe(error)
             }
         })
+        p.setVideoFrameMetadataListener { presentationTimeUs, _, _, _ -> onFrame(presentationTimeUs) }
+        return p
+    }
 
-        exo.setVideoFrameMetadataListener { presentationTimeUs, _, _, _ -> onFrame(presentationTimeUs) }
+    /** "small", "normal" or "large". Swaps in a new player and carries on with the same channel. */
+    fun setBufferMode(mode: String) {
+        if (mode == bufferMode) return
+        val old = exo
+        exoState.value = build(mode)
+        old.release()
+        if (!stopped) resume()
     }
 
     fun play(url: String) {
         currentUrl = url
+        stopped = false
+        hadReady = false
+        _stallSince.value = SystemClock.elapsedRealtime()
         retries = 0
         _error.value = null
         startMeasuring()
@@ -150,7 +194,7 @@ class PlayerController(context: Context) {
     /** Re-tune the last stream, e.g. after returning from the Shield home screen. */
     fun resume() { currentUrl?.let { play(it) } }
 
-    fun stop() { exo.stop() }
+    fun stop() { stopped = true; _stallSince.value = null; exo.stop() }
 
     fun release() {
         loudness?.release()

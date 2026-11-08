@@ -104,10 +104,10 @@ fun GroupsScreen(vm: AppViewModel) {
                             Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) {
                                 if (on) Text("✓", color = Palette.accent, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             }
-                            Text(
-                                g.name, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                            MarqueeText(
+                                g.name, modifier = Modifier.weight(1f),
                                 fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
-                                color = if (on) androidx.tv.material3.LocalContentColor.current else mutedColor(),
+                                color = if (on || LocalCardFocused.current) androidx.tv.material3.LocalContentColor.current else mutedColor(),
                             )
                             Text(
                                 if (shownCount == total) "$total" else "$shownCount/$total",

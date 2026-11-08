@@ -107,15 +107,10 @@ fun VideoLayer(vm: AppViewModel, player: PlayerController, matcher: RefreshRateM
                     this.player = player.exo
                 }
             },
+            update = { it.player = player.exo }, // the player is swapped when the buffer size changes
             modifier = Modifier.fillMaxSize(),
         )
-        if (error != null) {
-            Box(Modifier.align(Alignment.Center).clip(RoundedCornerShape(12.dp)).background(Color(0xCC000000)).padding(24.dp)) {
-                Text(error!!, color = Palette.text, style = MaterialTheme.typography.titleMedium)
-            }
-        } else if (buffering) {
-            Text("Loading…", color = Palette.muted, modifier = Modifier.align(Alignment.Center))
-        }
+        StallIndicator(vm, player, error, buffering, Modifier.align(Alignment.Center))
     }
 }
 
@@ -209,6 +204,7 @@ fun PlayerOverlay(vm: AppViewModel, player: PlayerController, matcher: RefreshRa
                     isFavourite = channel.streamId in vm.favourites,
                     epg = epg, info = info, stats = stats,
                     display = matcher.currentMode.value, afr = vm.afrEnabled,
+                    rebuffers = player.rebuffersRecently(),
                 )
                 if (panel == Panel.Recents) {
                     RecentsRow(
@@ -318,7 +314,7 @@ private fun ChannelListOverlay(vm: AppViewModel, current: Channel, onPick: (Chan
 @Composable
 private fun InfoBar(
     num: Int, name: String, icon: String?, isFavourite: Boolean,
-    epg: List<Programme>, info: StreamInfo, stats: StreamStats, display: String, afr: Boolean,
+    epg: List<Programme>, info: StreamInfo, stats: StreamStats, display: String, afr: Boolean, rebuffers: Int = 0,
 ) {
     val t = System.currentTimeMillis()
     val now = epg.firstOrNull { it.isOn(t) }
@@ -359,6 +355,12 @@ private fun InfoBar(
                 Text("%.1f Mbps  ·".format(stats.mbps), color = Palette.muted, style = MaterialTheme.typography.bodySmall)
                 Text("buffer %.1f s".format(stats.bufferSec), color = bufferColour, style = MaterialTheme.typography.bodySmall)
             }
+            if (rebuffers > 0) {
+                Text(
+                    "buffered ${rebuffers}× in 10 min",
+                    color = if (rebuffers >= 3) Palette.error else Palette.fav, style = MaterialTheme.typography.bodySmall,
+                )
+            }
             info.audio?.let { Text(it, color = Palette.muted, style = MaterialTheme.typography.bodySmall) }
         }
     }
@@ -376,3 +378,67 @@ private fun Badge(text: String, highlight: Boolean) {
 }
 
 private fun hm(ms: Long): String = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(ms))
+
+/**
+ * While the picture is stuck: a "Buffering" pill with live numbers, and after a few seconds
+ * a check of the internet, the provider and the account, saying which one is the problem.
+ */
+@Composable
+private fun StallIndicator(vm: AppViewModel, player: PlayerController, error: String?, buffering: Boolean, modifier: Modifier) {
+    val since by player.stallSince.collectAsState()
+    var stats by remember { mutableStateOf(StreamStats(0f, 0f)) }
+    var stuckSec by remember { mutableIntStateOf(0) }
+    var diagnosis by remember { mutableStateOf<com.andrewf13.tuned.data.Diagnosis?>(null) }
+    val stalled = since != null || error != null
+
+    LaunchedEffect(since, error) {
+        diagnosis = null
+        if (!stalled) return@LaunchedEffect
+        var diagnosed = false
+        while (true) {
+            stats = player.sampleStats()
+            stuckSec = since?.let { ((android.os.SystemClock.elapsedRealtime() - it) / 1000).toInt() } ?: 0
+            if (!diagnosed && (error != null || stuckSec >= 5)) {
+                diagnosed = true
+                diagnosis = vm.doctor.diagnose(vm.repo.profile, vm.repo.client, stats.mbps.takeIf { error == null })
+            }
+            delay(1_000)
+        }
+    }
+    if (!stalled) return
+
+    Column(
+        modifier.clip(RoundedCornerShape(16.dp)).background(Palette.panel.copy(alpha = 0.9f)).padding(horizontal = 28.dp, vertical = 20.dp).width(620.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (error != null) {
+            Text(error, color = Palette.text, style = MaterialTheme.typography.titleMedium)
+        } else {
+            val dots = ".".repeat(stuckSec % 3 + 1).padEnd(3)
+            Text(if (stuckSec < 3) "Loading$dots" else "Buffering$dots", color = Palette.text, style = MaterialTheme.typography.titleLarge)
+            Text(
+                "%.1f Mbps arriving  ·  %.1f s buffered".format(stats.mbps, stats.bufferSec) + if (stuckSec >= 3) "  ·  ${stuckSec}s" else "",
+                color = Palette.muted, style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        val d = diagnosis
+        if (d == null && (error != null || stuckSec >= 5)) {
+            Text("Checking your connection…", color = Palette.muted, style = MaterialTheme.typography.bodySmall)
+        }
+        if (d != null) {
+            val colour = when (d.verdict) {
+                com.andrewf13.tuned.data.Verdict.ALL_GOOD -> Palette.accent
+                com.andrewf13.tuned.data.Verdict.SLOW_STREAM -> Palette.fav
+                else -> Palette.error
+            }
+            Text(d.headline, color = colour, style = MaterialTheme.typography.titleMedium)
+            Text(d.advice, color = Palette.text, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "Internet " + (if (d.internet.ok) "✓ ${d.internet.ms} ms" else "✗") +
+                    "   ·   Provider " + (if (d.provider.ok) "✓ ${d.provider.ms} ms" else "✗"),
+                color = Palette.muted, style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}

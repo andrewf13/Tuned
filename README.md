@@ -1,6 +1,6 @@
 # Tuned
 
-A fast, simple IPTV player for Android TV and Fire TV. Sign in with your Xtream Codes details and you're watching in two button presses. 4K HDR plays as HDR, and the TV switches to the right refresh rate for each channel.
+A fast, simple IPTV player for Android TV and Fire TV. Sign in with Xtream Codes (or add an M3U playlist) and you're watching in two button presses. 4K HDR plays as HDR, and the TV switches to the right refresh rate for each channel.
 
 ![Channel list over the live picture](docs/list-over-video.png)
 
@@ -12,7 +12,7 @@ A fast, simple IPTV player for Android TV and Fire TV. Sign in with your Xtream 
 
 There's **one APK for every device below**: the same file works on all of them.
 
-**[⬇ Download the latest APK](https://github.com/andrewf13/Tuned/raw/main/releases/tuned-latest.apk)** (10 MB, Android 6.0 or newer). Current version **0.5.0** · SHA-256 in [`releases/tuned-0.5.0.apk.sha256`](releases/tuned-0.5.0.apk.sha256)
+**[⬇ Download the latest APK](https://github.com/andrewf13/Tuned/raw/main/releases/tuned-latest.apk)** (10 MB, Android 6.0 or newer). Current version **0.6.0** · SHA-256 in [`releases/tuned-0.6.0.apk.sha256`](releases/tuned-0.6.0.apk.sha256)
 
 **Link to type into Downloader on your TV** (always the newest version):
 ```
@@ -64,7 +64,7 @@ Install the newer APK over the top the same way. Your login, favourites and sett
 
 ## 3. First run
 1. Open **Tuned** from your apps row.
-2. Type your **server** (e.g. `http://example.com:8080`), **username** and **password**. Pasting a full M3U link (`get.php?username=…&password=…`) into the Server box also works.
+2. Choose **Xtream Codes** and enter your **server** (e.g. `http://example.com:8080`), **username** and **password**. A full `get.php?username=…&password=…` link in the Server box also works. Or choose **M3U playlist** and enter the playlist link (for providers without Xtream Codes).
 3. Already have a backup? Press **Restore from a backup instead** (see section 6).
 4. Press **Groups** and choose the groups you actually watch. Providers often have hundreds.
 
@@ -114,9 +114,12 @@ Text boxes are buttons until you press **OK**, which opens the keyboard. The key
 
 | Setting | What it does |
 |---|---|
+| **Profile** | Switch provider, edit a login, or add another Xtream Codes account or M3U playlist (see below) |
 | **Colour** | Graphite grey, Midnight blue, Pitch green or Aurora violet |
 | **Match frame rate** | Switches the TV to suit each channel (23.976, 24, 50, 59.94 or 60 Hz). Also needs the device setting from section 2 |
-| **Stream format** | MPEG-TS (fastest) or HLS. Try HLS if a channel won't play |
+| **Stream format** | MPEG-TS (fastest) or HLS. Try HLS if a channel won't play (Xtream only) |
+| **Buffer size** | Small (quickest channel changes), Normal, or Large (rides out a shaky connection). Takes effect straight away |
+| **Test connection** | Checks your internet and your provider's server, and says which one is the problem |
 | **Volume boost** | Off / +3 / +6 / +9 / +12 dB for quiet channels, with a limiter. Works on audio the device decodes itself (AAC, MP2). Dolby audio sent straight to a soundbar or AV receiver isn't changed |
 | **Channel order** | Provider order or A–Z |
 | **Choose groups** | Same as the Groups button (› inside a group picks its channels) |
@@ -125,6 +128,25 @@ Text boxes are buttons until you press **OK**, which opens the keyboard. The key
 | **Exit Tuned** | Close the app |
 
 ![Colours](docs/colours.png)
+
+### Profiles
+![Profiles](docs/profiles.png)
+
+Each profile is one provider: an **Xtream Codes** login or an **M3U playlist** link. Favourites, chosen groups and channels, and recent channels are kept separately for each profile. Settings → Profile → OK on a profile switches to it; **Edit** changes the login or deletes it; **+ Add a provider** adds another.
+
+M3U playlists play every channel and support groups, favourites and search. Their TV guide isn't loaded (yet). Movie and series entries in a playlist are skipped.
+
+### When the picture stops (buffering)
+While a channel is stuck, a panel shows **Buffering…** with how much data is arriving and how many seconds are buffered. After 5 seconds Tuned checks what's wrong and tells you:
+
+| Message | Meaning |
+|---|---|
+| **No internet connection** | The device can't reach the internet: check Wi-Fi / cable / router |
+| **Your provider's server isn't responding** | Your internet is fine; the problem is on the provider's side |
+| **Your account is Expired** / **Too many connections** | Reported by your provider (Xtream Codes) |
+| **This stream is arriving too slowly** | Internet and provider are both fine, but this channel's source is struggling: try another channel, or a **Large** buffer |
+
+The info bar also warns when a channel has **buffered several times in the last 10 minutes**.
 
 ### Groups
 ![Groups](docs/groups.png)
@@ -150,7 +172,7 @@ Ticking a channel in an unticked group shows the group again, with just your tic
 
 ![Backup](docs/backup.png)
 
-A backup holds your **login, favourites, chosen groups and channels, recent channels and settings**, in one file encrypted with a passphrase you choose (AES-256, key derived with PBKDF2).
+A backup holds **every profile** (logins and playlist links) with each one's **favourites, chosen groups and channels and recent channels**, plus your **settings**, in one file encrypted with a passphrase you choose (AES-256, key derived with PBKDF2).
 
 - **Save:** Settings → Backup & restore → enter a passphrase (6+ characters) → **Save backup**. It goes to **Download/Tuned** on the device.
 - **Restore:** same screen (or **Restore from a backup instead** at sign-in) → enter the passphrase → pick the backup → press OK twice.
@@ -163,6 +185,7 @@ A backup holds your **login, favourites, chosen groups and channels, recent chan
 
 | Problem | Try |
 |---|---|
+| Picture keeps stopping | Read the buffering panel: it says whether it's your internet, the provider or the channel. Settings → Buffer size → Large helps on a shaky connection |
 | A channel shows an error | Some channels are simply offline. Otherwise Settings → Stream format → HLS |
 | "Refused" errors on every channel | Your provider's connection limit: close the app on other devices |
 | TV doesn't switch refresh rate | Check the device setting in section 2. Info bar should show `50 fps · TV 50 Hz` |
@@ -171,5 +194,8 @@ A backup holds your **login, favourites, chosen groups and channels, recent chan
 | No "what's on" text | Your provider doesn't send guide data for that channel |
 
 ---
+
+## Licence
+Tuned is open source under the [Apache License 2.0](LICENSE): you can use, change and share it, including commercially, as long as you keep the licence and copyright notices. See [`NOTICE`](NOTICE) for the open-source libraries it's built with.
 
 *For building from source, see [`android/README.md`](android/README.md).*

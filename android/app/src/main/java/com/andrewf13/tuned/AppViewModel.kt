@@ -16,15 +16,24 @@ import com.andrewf13.tuned.data.Prefs
 import com.andrewf13.tuned.data.Repository
 import kotlinx.coroutines.launch
 
-enum class Screen { Login, Loading, Home, Player, Settings, Groups, GroupChannels, Backup }
+/** Login is the add/edit-profile form (also the first-run screen). */
+enum class Screen { Login, Loading, Home, Player, Settings, Groups, GroupChannels, Backup, Profiles }
 
 data class RailItem(val key: String, val label: String, val count: Int?)
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     val prefs = Prefs(app)
-    val repo = Repository(app, prefs)
+    val repo = Repository(app).also { it.setProfile(prefs.activeProfile) }
+    val doctor = com.andrewf13.tuned.data.NetworkDoctor(repo.http)
 
-    var screen by mutableStateOf(if (prefs.account == null) Screen.Login else Screen.Loading)
+    var screen by mutableStateOf(if (prefs.activeProfile == null) Screen.Login else Screen.Loading)
+        private set
+    var profiles by mutableStateOf(prefs.profiles)
+        private set
+    var activeProfileId by mutableStateOf(prefs.activeProfileId)
+        private set
+    /** Profile open in the form, or null when adding a new one. */
+    var editingProfile by mutableStateOf<com.andrewf13.tuned.data.Profile?>(null)
         private set
 
     // ---- Lineup ---------------------------------------------------------------------------
@@ -52,15 +61,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var allVisible: List<Channel> = emptyList()
     private var byId: Map<Int, Channel> = emptyMap()
 
-    var favourites by mutableStateOf(prefs.favourites)
+    var favourites by mutableStateOf(prefs.current.favourites)
         private set
-    var hiddenChannels by mutableStateOf(prefs.hiddenChannels)
+    var hiddenChannels by mutableStateOf(prefs.current.hiddenChannels)
         private set
     /** The group open in the channel picker. */
     var editingGroupId by mutableStateOf<String?>(null)
         private set
     private var allByCategory: Map<String?, List<Channel>> = emptyMap()
-    var groupFilter by mutableStateOf(prefs.visibleGroups)
+    var groupFilter by mutableStateOf(prefs.current.visibleGroups)
         private set
     var sortAlpha by mutableStateOf(prefs.sortAlpha)
         private set
@@ -69,10 +78,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Set when the rail should open (and take focus) as Home appears, e.g. second Left in full screen. */
     var railRequested by mutableStateOf(false)
-    var recents by mutableStateOf(prefs.recents)
+    var recents by mutableStateOf(prefs.current.recents)
         private set
 
-    var selectedKey by mutableStateOf(prefs.lastCategory.takeIf { it != "search" } ?: "all")
+    var selectedKey by mutableStateOf(prefs.current.lastCategory.takeIf { it != "search" } ?: "all")
         private set
     var searchQuery by mutableStateOf("")
     var status by mutableStateOf<String?>(null)
@@ -80,7 +89,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         private set
 
     /** Row to focus when the channel list is shown (e.g. after leaving the player). */
-    var focusStreamId by mutableStateOf<Int?>(prefs.lastStreamId.takeIf { it > 0 })
+    var focusStreamId by mutableStateOf<Int?>(prefs.current.lastStreamId.takeIf { it > 0 })
 
     // ---- Settings -------------------------------------------------------------------------
     var afrEnabled by mutableStateOf(prefs.afrEnabled)
@@ -90,6 +99,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var resumeOnStart by mutableStateOf(prefs.resumeOnStart)
         private set
     var volumeBoostDb by mutableIntStateOf(prefs.volumeBoostDb)
+        private set
+    var bufferMode by mutableStateOf(prefs.bufferMode)
         private set
 
     // ---- Playback -------------------------------------------------------------------------
@@ -105,7 +116,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val playing: Channel? get() = playlist.getOrNull(playingIndex)
 
     init {
-        if (prefs.account != null) start(resume = true)
+        if (prefs.activeProfile != null) start(resume = true)
     }
 
     private fun apply(l: Lineup) {
@@ -167,7 +178,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun enterHome(resume: Boolean) {
         screen = Screen.Home
         if (resume && prefs.resumeOnStart) {
-            val last = byId[prefs.lastStreamId] ?: return
+            val last = byId[prefs.current.lastStreamId] ?: return
             val list = channelsFor(selectedKey).takeIf { l -> l.any { it.streamId == last.streamId } }
             if (list != null) play(list, selectedKey, last) else tune(last).also { screen = Screen.Player }
         }
@@ -211,7 +222,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (key == selectedKey) return
         selectedKey = key
         // Search is never remembered: reopening the app should land on real channels.
-        if (key != "search") prefs.lastCategory = key
+        if (key != "search") prefs.current.lastCategory = key
     }
 
     // ---- Playback -------------------------------------------------------------------------
@@ -219,7 +230,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         playlist = list
         playlistKey = key
         playingIndex = list.indexOfFirst { it.streamId == c.streamId }.coerceAtLeast(0)
-        prefs.lastStreamId = c.streamId
+        prefs.current.lastStreamId = c.streamId
     }
 
     /** Start (or keep) a channel playing behind the list. */
@@ -236,7 +247,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val idx = playlist.indexOfFirst { it.streamId == c.streamId }
         if (idx >= 0) {
             playingIndex = idx
-            prefs.lastStreamId = c.streamId
+            prefs.current.lastStreamId = c.streamId
         } else {
             val (list, key) = listFor(c) ?: (listOf(c) to "all")
             setPlaylist(list, key, c)
@@ -246,14 +257,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun zap(delta: Int) {
         if (playlist.isEmpty()) return
         playingIndex = (playingIndex + delta).mod(playlist.size)
-        playing?.let { prefs.lastStreamId = it.streamId }
+        playing?.let { prefs.current.lastStreamId = it.streamId }
     }
 
     /** Called once a channel has been watched for a few seconds, so zapping doesn't fill the list. */
     fun markWatched(id: Int) {
         if (recents.firstOrNull() == id) return
         recents = (listOf(id) + (recents - id)).take(11)
-        prefs.recents = recents
+        prefs.current.recents = recents
     }
 
     fun recentChannels(): List<Channel> =
@@ -279,11 +290,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         focusStreamId = null // the rail takes focus, not the channel row
     }
 
-    fun streamUrl(c: Channel): String = repo.client?.liveUrl(c.streamId, streamFormat) ?: ""
+    fun streamUrl(c: Channel): String = repo.streamUrl(c, streamFormat)
 
     fun toggleFavourite(id: Int) {
         favourites = if (id in favourites) favourites - id else favourites + id
-        prefs.favourites = favourites
+        prefs.current.favourites = favourites
     }
 
     // ---- Groups ---------------------------------------------------------------------------
@@ -305,12 +316,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun setHidden(h: Set<Int>, groupId: String) {
         hiddenChannels = h
-        prefs.hiddenChannels = h
+        prefs.current.hiddenChannels = h
         // Ticking a channel in an unticked group makes the group show up too.
         if (!isGroupShown(groupId) && channelsInGroup(groupId).any { it.streamId !in h }) {
             val cur = groupFilter ?: allCategories.map { it.id }.toSet()
             groupFilter = cur + groupId
-            prefs.visibleGroups = groupFilter
+            prefs.current.visibleGroups = groupFilter
         }
         rebuild()
     }
@@ -329,7 +340,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun applyGroupFilter(f: Set<String>?) {
         groupFilter = f
-        prefs.visibleGroups = f
+        prefs.current.visibleGroups = f
         rebuild()
     }
 
@@ -357,6 +368,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         prefs.volumeBoostDb = volumeBoostDb
     }
 
+    fun cycleBuffer() {
+        val modes = listOf("small", "normal", "large")
+        bufferMode = modes[(modes.indexOf(bufferMode) + 1).mod(modes.size)]
+        prefs.bufferMode = bufferMode
+    }
+
     fun refresh() {
         if (refreshing) return
         viewModelScope.launch {
@@ -368,18 +385,93 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     suspend fun accountInfo(): AccountInfo? = runCatching { repo.client?.authenticate() }.getOrNull()
 
-    /** Returns an error message, or null on success. */
-    suspend fun login(server: String, user: String, pass: String): String? {
+    // ---- Profiles -------------------------------------------------------------------------
+    fun openProfiles() { screen = Screen.Profiles }
+    fun addProfile() { editingProfile = null; screen = Screen.Login }
+    fun editProfile(p: com.andrewf13.tuned.data.Profile) { editingProfile = p; screen = Screen.Login }
+    fun closeProfileForm() { screen = if (prefs.activeProfile == null) Screen.Login else Screen.Profiles }
+
+    /**
+     * Checks and saves a profile from the form, then switches to it.
+     * Xtream: [server] may also be a full get.php link. M3U: [m3uUrl] is the playlist link.
+     * Returns an error message, or null on success.
+     */
+    suspend fun saveProfile(
+        name: String, type: com.andrewf13.tuned.data.SourceType,
+        server: String, user: String, pass: String, m3uUrl: String,
+    ): String? {
         return try {
-            val account = AccountParser.parse(server, user, pass)
-            repo.clientFor(account).authenticate()
-            repo.setAccount(account)
-            screen = Screen.Loading
-            start(resume = false)
+            val existing = editingProfile
+            val id = existing?.id ?: java.util.UUID.randomUUID().toString().take(8)
+            val profile = when (type) {
+                com.andrewf13.tuned.data.SourceType.XTREAM -> {
+                    val a = AccountParser.parse(server, user, pass)
+                    com.andrewf13.tuned.data.Profile(id, name.trim().ifEmpty { hostName(a.server) }, type, a.server, a.username, a.password)
+                }
+                com.andrewf13.tuned.data.SourceType.M3U -> {
+                    if (m3uUrl.isBlank()) throw com.andrewf13.tuned.data.XtreamException("Enter the playlist link")
+                    com.andrewf13.tuned.data.Profile(id, name.trim().ifEmpty { hostName(m3uUrl) }, type, m3uUrl = m3uUrl.trim())
+                }
+            }
+            repo.verify(profile)
+            val sourceChanged = existing == null || existing.type != profile.type || existing.server != profile.server ||
+                existing.username != profile.username || existing.m3uUrl != profile.m3uUrl
+            prefs.upsertProfile(profile)
+            if (sourceChanged) repo.deleteCache(id)
+            profiles = prefs.profiles
+            if (sourceChanged || activeProfileId != id) switchProfile(id) else { editingProfile = null; screen = Screen.Profiles }
             null
         } catch (e: Exception) {
-            e.message ?: "Sign-in failed"
+            e.message ?: "Couldn't connect"
         }
+    }
+
+    private fun hostName(url: String) =
+        url.substringAfter("://").substringBefore('/').substringBefore(':').ifEmpty { "Provider" }
+
+    /** Make another profile active: its own channels, favourites, groups and recents. */
+    fun switchProfile(id: String) {
+        prefs.activeProfileId = id
+        activeProfileId = id
+        editingProfile = null
+        reloadFromPrefs()
+    }
+
+    fun deleteProfile(id: String) {
+        repo.deleteCache(id)
+        prefs.removeProfile(id)
+        profiles = prefs.profiles
+        if (activeProfileId == id || prefs.activeProfile == null) {
+            activeProfileId = prefs.activeProfileId
+            reloadFromPrefs()
+        }
+    }
+
+    /** Re-read everything from storage (after a profile switch or a restore) and reload channels. */
+    private fun reloadFromPrefs() {
+        val st = prefs.current
+        favourites = st.favourites
+        hiddenChannels = st.hiddenChannels
+        groupFilter = st.visibleGroups
+        recents = st.recents
+        selectedKey = st.lastCategory.takeIf { it != "search" } ?: "all"
+        focusStreamId = st.lastStreamId.takeIf { it > 0 }
+        sortAlpha = prefs.sortAlpha
+        groupSortAlpha = prefs.groupSortAlpha
+        afrEnabled = prefs.afrEnabled
+        streamFormat = prefs.streamFormat
+        resumeOnStart = prefs.resumeOnStart
+        volumeBoostDb = prefs.volumeBoostDb
+        bufferMode = prefs.bufferMode
+        com.andrewf13.tuned.ui.Palette.theme = com.andrewf13.tuned.ui.Themes.byId(prefs.themeId)
+        profiles = prefs.profiles
+        activeProfileId = prefs.activeProfileId
+        playlist = emptyList(); playingIndex = -1
+        rawCategories = emptyList(); channels = emptyList(); rebuild()
+        repo.setProfile(prefs.activeProfile)
+        if (prefs.activeProfile == null) { editingProfile = null; screen = Screen.Login; return }
+        screen = Screen.Loading
+        start(resume = false)
     }
 
     // ---- Backup ---------------------------------------------------------------------------
@@ -399,33 +491,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val plain = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
             com.andrewf13.tuned.data.BackupCrypto.decrypt(file, passphrase.toCharArray())
         }
-        val account = com.andrewf13.tuned.data.Backup.import(plain, prefs)
-        favourites = prefs.favourites
-        hiddenChannels = prefs.hiddenChannels
-        groupFilter = prefs.visibleGroups
-        recents = prefs.recents
-        sortAlpha = prefs.sortAlpha
-        groupSortAlpha = prefs.groupSortAlpha
-        afrEnabled = prefs.afrEnabled
-        streamFormat = prefs.streamFormat
-        resumeOnStart = prefs.resumeOnStart
-        volumeBoostDb = prefs.volumeBoostDb
-        com.andrewf13.tuned.ui.Palette.theme = com.andrewf13.tuned.ui.Themes.byId(prefs.themeId)
-        selectedKey = prefs.lastCategory.takeIf { it != "search" } ?: "all"
-        playlist = emptyList(); playingIndex = -1
-        repo.setAccount(null) // clears the old provider's cached channel list
-        repo.setAccount(account)
-        screen = Screen.Loading
-        start(resume = false)
+        com.andrewf13.tuned.data.Backup.import(plain, prefs)
+        reloadFromPrefs()
     }
 
     fun openBackup() { screen = Screen.Backup }
-    fun closeBackup() { screen = if (repo.client != null) Screen.Settings else Screen.Login }
+    fun closeBackup() { screen = if (prefs.activeProfile != null) Screen.Settings else Screen.Login }
 
-    fun signOut() {
-        repo.setAccount(null)
-        rawCategories = emptyList(); channels = emptyList(); rebuild()
-        playlist = emptyList(); playingIndex = -1
-        screen = Screen.Login
-    }
 }

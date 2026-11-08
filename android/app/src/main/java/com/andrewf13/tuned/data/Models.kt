@@ -11,6 +11,8 @@ data class Channel(
     val icon: String?,
     val categoryId: String?,
     val epgId: String?,
+    /** Direct stream URL (M3U playlists). Xtream channels build theirs from the account. */
+    val url: String? = null,
 )
 
 data class Programme(
@@ -32,3 +34,23 @@ data class AccountInfo(
 )
 
 class XtreamException(message: String) : Exception(message)
+
+enum class SourceType { XTREAM, M3U }
+
+/** One provider login. Favourites, groups and recents are kept per profile. */
+data class Profile(
+    val id: String,
+    val name: String,
+    val type: SourceType,
+    val server: String = "",
+    val username: String = "",
+    val password: String = "",
+    val m3uUrl: String = "",
+) {
+    val account: Account get() = Account(server, username, password)
+    val summary: String
+        get() = when (type) {
+            SourceType.XTREAM -> "Xtream Codes · $username @ ${server.removePrefix("http://").removePrefix("https://")}"
+            SourceType.M3U -> "M3U playlist · " + m3uUrl.removePrefix("http://").removePrefix("https://").substringBefore('?').take(60)
+        }
+}

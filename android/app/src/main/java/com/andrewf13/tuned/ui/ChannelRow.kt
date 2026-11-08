@@ -64,7 +64,7 @@ fun ChannelRow(
             modifier = Modifier.size(width = 64.dp, height = 40.dp),
         )
         Column(Modifier.weight(1f)) {
-            Text(channel.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleMedium)
+            MarqueeText(channel.name, style = MaterialTheme.typography.titleMedium)
             now?.let {
                 Text(it.title, maxLines = 1, overflow = TextOverflow.Ellipsis, color = mutedColor(), style = MaterialTheme.typography.bodySmall)
             }
