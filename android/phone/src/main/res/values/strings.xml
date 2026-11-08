@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Tuned Remote</string>
+    <string name="widget_description">Your favourite channels: tap one to change channel on the TV</string>
 </resources>

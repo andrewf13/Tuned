@@ -22,7 +22,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        setContent { RemoteTheme { RemoteApp(vm) } }
+        setContent { RemoteTheme(vm.themeMode) { RemoteApp(vm) } }
     }
 
     override fun onResume() {
@@ -31,10 +31,10 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** Material You: the phone's own wallpaper colours on Android 12+, Tuned blue otherwise. */
+/** Material You: the phone's own wallpaper colours on Android 12+, Tuned blue otherwise. Light, dark or follow the system. */
 @Composable
-fun RemoteTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
+fun RemoteTheme(mode: String = "system", content: @Composable () -> Unit) {
+    val dark = when (mode) { "light" -> false; "dark" -> true; else -> isSystemInDarkTheme() }
     val ctx = LocalContext.current
     val scheme = when {
         Build.VERSION.SDK_INT >= 31 && dark -> dynamicDarkColorScheme(ctx)

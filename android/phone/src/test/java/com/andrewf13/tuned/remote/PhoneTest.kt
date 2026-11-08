@@ -25,7 +25,7 @@ import org.robolectric.shadows.ShadowLooper
 import java.io.File
 
 /** A pretend TV speaking the same API as Tuned's RemoteApi. */
-private class FakeTv : Dispatcher() {
+internal class FakeTv : Dispatcher() {
     var playing = 101
     val plays = mutableListOf<Int>()
     private val now = System.currentTimeMillis()
@@ -136,5 +136,79 @@ class PhoneTest {
         compose.runOnUiThread { vm.finishPairing("4821") {} }
         idleUntil { vm.page == Page.Channels }
         assertEquals("t0k3n", RemoteStore(app).tv?.token)
+    }
+
+    @Test fun darkMode() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        RemoteStore(app).tv = SavedTv("Tuned on SHIELD Android TV", "127.0.0.1", server.port, "t0k3n")
+        RemoteStore(app).themeMode = "dark"
+        val vm = RemoteViewModel(app)
+        idleUntil { vm.lineup.channels.isNotEmpty() && vm.state != null }
+        compose.setContent { RemoteTheme(vm.themeMode) { RemoteApp(vm) } }
+        idleUntil { vm.guide.containsKey(104) }
+        shot("phone-dark")
+        RemoteStore(app).themeMode = "system"
+    }
+
+    /** Widget buttons change channel on the TV without the app open. */
+    @Test fun widgetChangesChannel() = runBlocking {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val store = RemoteStore(app)
+        store.tv = SavedTv("Tuned on SHIELD Android TV", "127.0.0.1", server.port, "t0k3n")
+        assertEquals(null, WidgetActions.refresh(app))
+        assertEquals(listOf("Fox Footy HD", "Fox League HD", "Sky Sport 1 NZ", "Sky Sports F1 UHD"), store.widgetChannels.map { it.second })
+        assertEquals(null, WidgetActions.play(app, 104))
+        assertEquals(listOf(104), tv.plays)
+        assertEquals("Sky Sport 1 NZ", store.nowPlaying)
+        store.tv = SavedTv("x", "127.0.0.1", 1, "t") // nothing listening
+        assertTrue(WidgetActions.play(app, 104)!!.startsWith("Can't reach"))
+    }
+
+    @Test fun widgetLooks() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val store = RemoteStore(app)
+        store.tv = SavedTv("Tuned on SHIELD Android TV", "127.0.0.1", server.port, "t0k3n")
+        runBlocking { WidgetActions.refresh(app) }
+        store.nowPlaying = "Fox League HD"
+        val opts = android.os.Bundle().apply { putInt(android.appwidget.AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 260) }
+        compose.setContent {
+            androidx.compose.ui.viewinterop.AndroidView(
+                factory = { ctx ->
+                    android.widget.FrameLayout(ctx).apply {
+                        setBackgroundColor(0xFF5B7A99.toInt()) // stand-in wallpaper
+                        val w = ChannelWidget.build(ctx, opts).apply(ctx, this)
+                        val d = ctx.resources.displayMetrics.density
+                        addView(w, android.widget.FrameLayout.LayoutParams((250 * d).toInt(), (260 * d).toInt()).apply { setMargins((40 * d).toInt(), (60 * d).toInt(), 0, 0) })
+                    }
+                },
+            )
+        }
+        shot("widget-light")
+    }
+}
+
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [34], qualifiers = "w1280dp-h800dp-land-xhdpi") // Galaxy Tab S9 FE in landscape: 2304 × 1440
+class TabletTest {
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+    private val server = MockWebServer().apply { dispatcher = FakeTv() }
+    @Before fun start() = server.start()
+    @After fun stop() = server.shutdown()
+
+    @Test fun tabletLayout() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        RemoteStore(app).tv = SavedTv("Tuned on SHIELD Android TV", "127.0.0.1", server.port, "t0k3n")
+        RemoteStore(app).lastFilter = "all"
+        val vm = RemoteViewModel(app)
+        repeat(200) { ShadowLooper.idleMainLooper(); if (vm.lineup.channels.isNotEmpty() && vm.state != null) return@repeat; Thread.sleep(25) }
+        compose.setContent { RemoteTheme("dark") { RemoteApp(vm) } }
+        repeat(200) { ShadowLooper.idleMainLooper(); runCatching { compose.waitForIdle() }; if (vm.guide.containsKey(112)) return@repeat; Thread.sleep(25) }
+        compose.waitForIdle()
+        val view = compose.activity.window.decorView
+        val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        view.draw(Canvas(bmp))
+        File("build/screenshots").apply { mkdirs() }.resolve("tablet.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        assertTrue(vm.guide.containsKey(112))
     }
 }

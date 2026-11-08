@@ -19,7 +19,7 @@ There's **one APK for every device below**: the same file works on all of them.
 https://github.com/andrewf13/Tuned/raw/main/releases/tuned-latest.apk
 ```
 
-**📱 Phone remote (optional):** [⬇ Tuned Remote for Android phones](https://github.com/andrewf13/Tuned/raw/main/releases/tuned-remote-latest.apk) (7 MB, Android 8.0+). See [section 6](#6-phone-remote).
+**📱 Phone & tablet remote (optional):** [⬇ Tuned Remote](https://github.com/andrewf13/Tuned/raw/main/releases/tuned-remote-latest.apk) (7 MB, Android 8.0+ phones and tablets). Current version **0.8.0**. See [section 6](#6-phone-remote).
 
 | Device | Status | Refresh-rate switching | HDR |
 |---|---|---|---|
@@ -173,7 +173,7 @@ Ticking a channel in an unticked group shows the group again, with just your tic
 
 ## 6. Phone remote
 
-**Tuned Remote** is a companion app for your Android phone (made on a Galaxy S25). It shows the TV's channel list with what's on now and next, and **tapping a channel changes it on the TV**.
+**Tuned Remote** is a companion app for your Android phone or tablet (made on a Galaxy S25 and Galaxy Tab S9 FE). It shows the TV's channel list with what's on now and next, and **tapping a channel changes it on the TV**.
 
 ![Tuned Remote on a phone](docs/phone-remote.png)
 
@@ -188,7 +188,16 @@ Ticking a channel in an unticked group shows the group again, with just your tic
 | **Search** | Find any channel in the TV's list |
 | **Tap a channel** | Changes channel on the TV (it goes full screen) |
 | Top bar | What's on the TV right now |
+| ⋮ → **Appearance** | System, Light or Dark (Light/Dark override the phone's setting; colours follow your wallpaper on Android 12+) |
 | ⋮ → **Forget this TV** | Unpair |
+
+**Home-screen widget.** Long-press your home screen → Widgets → **Tuned Remote** → *Tuned channels*. It lists your favourites; **tap one and the TV changes channel**, without opening the app. The top line shows what's on the TV; ↻ refreshes it. Make the widget taller to show more favourites. It follows the phone's light/dark mode.
+
+![Widget](docs/widget.png)
+
+**Tablets.** On a tablet (or a phone in landscape with a wide screen) the app shows the groups down the side and channels as a grid of cards:
+
+![Tuned Remote on a tablet](docs/tablet-remote.png)
 
 - The phone works while **Tuned is open on the TV**. If the TV is on its home screen, open Tuned first.
 - The phone never receives your provider login, only channel names, logos and the guide. Only phones that entered a code on the TV can change channels.

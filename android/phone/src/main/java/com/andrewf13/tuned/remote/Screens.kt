@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,6 +21,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
@@ -144,6 +150,9 @@ fun PairScreen(vm: RemoteViewModel) {
 
 // ---- Channels and guide --------------------------------------------------------------------
 
+/** Below this width: phone layout (one list). Above: tablet layout (groups pane + channel grid). */
+private const val TABLET_DP = 700
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChannelsScreen(vm: RemoteViewModel) {
@@ -151,17 +160,8 @@ fun ChannelsScreen(vm: RemoteViewModel) {
     LaunchedEffect(vm.toast) { vm.toast?.let { snack.showSnackbar(it); vm.toast = null } }
     val now by produceState(System.currentTimeMillis()) { while (true) { delay(30_000); value = System.currentTimeMillis() } }
     val list = remember(vm.lineup, vm.filter, vm.query) { vm.visible() }
-    val listState = rememberLazyListState()
-    val playingId = vm.state?.playing?.id
+    val wide = LocalConfiguration.current.screenWidthDp >= TABLET_DP
     var menu by remember { mutableStateOf(false) }
-
-    // Ask the TV for guide data for whatever is on screen.
-    LaunchedEffect(list) {
-        snapshotFlow { listState.layoutInfo.visibleItemsInfo.mapNotNull { it.key as? Int } }
-            .distinctUntilChanged()
-            .collect { ids -> if (ids.isNotEmpty()) vm.needGuide((ids + list.take(20).map { it.id }).distinct()) }
-    }
-    LaunchedEffect(vm.filter, vm.query) { listState.scrollToItem(0) }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snack) },
@@ -186,51 +186,149 @@ fun ChannelsScreen(vm: RemoteViewModel) {
         },
     ) { pad ->
         Column(Modifier.fillMaxSize().padding(pad)) {
-            if (menu) {
-                Card(Modifier.fillMaxWidth().padding(12.dp)) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Paired with ${vm.tvName}", style = MaterialTheme.typography.titleSmall)
-                        vm.state?.profile?.let { Text("Provider profile on the TV: $it", style = MaterialTheme.typography.bodySmall) }
-                        TextButton(onClick = { menu = false; vm.forgetTv() }) { Text("Forget this TV") }
+            if (menu) MenuCard(vm) { menu = false }
+            vm.problem?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
+            if (wide) {
+                Row(Modifier.fillMaxSize()) {
+                    GroupPane(vm, Modifier.width(280.dp).fillMaxHeight())
+                    Column(Modifier.weight(1f)) {
+                        SearchField(vm)
+                        ChannelGrid(vm, list, now)
                     }
                 }
-            }
-            OutlinedTextField(
-                vm.query, { vm.query = it }, singleLine = true, placeholder = { Text("Search channels") },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-            )
-            LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                item { FilterChip(vm.filter == "fav", { vm.chooseFilter("fav") }, label = { Text("★ Favourites") }) }
-                item { FilterChip(vm.filter == "all", { vm.chooseFilter("all") }, label = { Text("All") }) }
-                items(vm.lineup.groups, key = { it.id }) { g ->
-                    FilterChip(vm.filter == "g:${g.id}", { vm.chooseFilter("g:${g.id}") }, label = { Text(g.name, maxLines = 1) })
-                }
-            }
-            vm.problem?.let {
-                Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
-            }
-            if (list.isEmpty() && !vm.loading) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        if (vm.filter == "fav") "No favourites yet. Hold OK on a channel on the TV to add one." else "No channels",
-                        textAlign = TextAlign.Center, modifier = Modifier.padding(32.dp),
-                    )
-                }
-            }
-            LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 24.dp)) {
-                items(list, key = { it.id }) { ch ->
-                    ChannelItem(ch, vm.guide[ch.id], now, ch.id == playingId) { vm.play(ch) }
-                }
+            } else {
+                SearchField(vm)
+                FilterChips(vm)
+                ChannelList(vm, list, now)
             }
         }
     }
 }
 
 @Composable
-private fun ChannelItem(ch: TvChannel, guide: List<GuideItem>?, now: Long, playing: Boolean, onClick: () -> Unit) {
+private fun MenuCard(vm: RemoteViewModel, close: () -> Unit) {
+    Card(Modifier.fillMaxWidth().padding(12.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Appearance", style = MaterialTheme.typography.titleSmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("system" to "System", "light" to "Light", "dark" to "Dark").forEach { (k, label) ->
+                    FilterChip(vm.themeMode == k, { vm.chooseTheme(k) }, label = { Text(label) })
+                }
+            }
+            HorizontalDivider(Modifier.padding(vertical = 4.dp))
+            Text("Paired with ${vm.tvName}", style = MaterialTheme.typography.titleSmall)
+            vm.state?.profile?.let { Text("Provider profile on the TV: $it", style = MaterialTheme.typography.bodySmall) }
+            Text("Tip: add the Tuned channels widget to your home screen to change channel without opening the app.", style = MaterialTheme.typography.bodySmall)
+            Row {
+                TextButton(onClick = close) { Text("Close") }
+                TextButton(onClick = { close(); vm.forgetTv() }) { Text("Forget this TV") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchField(vm: RemoteViewModel) {
+    OutlinedTextField(
+        vm.query, { vm.query = it }, singleLine = true, placeholder = { Text("Search channels") },
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+    )
+}
+
+private data class Filter(val key: String, val label: String)
+
+private fun filters(vm: RemoteViewModel) =
+    listOf(Filter("fav", "★ Favourites"), Filter("all", "All")) + vm.lineup.groups.map { Filter("g:${it.id}", it.name) }
+
+@Composable
+private fun FilterChips(vm: RemoteViewModel) {
+    LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(filters(vm), key = { it.key }) { f ->
+            FilterChip(vm.filter == f.key, { vm.chooseFilter(f.key) }, label = { Text(f.label, maxLines = 1) })
+        }
+    }
+}
+
+/** Tablet: the TV's groups down the side. */
+@Composable
+private fun GroupPane(vm: RemoteViewModel, modifier: Modifier) {
+    LazyColumn(modifier.background(MaterialTheme.colorScheme.surfaceContainerLow), contentPadding = PaddingValues(8.dp)) {
+        items(filters(vm), key = { it.key }) { f ->
+            val on = vm.filter == f.key && vm.query.isBlank()
+            Text(
+                f.label, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.titleSmall,
+                color = if (on) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
+                    .background(if (on) MaterialTheme.colorScheme.secondaryContainer else Color0)
+                    .clickable { vm.query = ""; vm.chooseFilter(f.key) }
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmptyList(vm: RemoteViewModel) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text(
+            if (vm.filter == "fav") "No favourites yet. Hold OK on a channel on the TV to add one." else "No channels",
+            textAlign = TextAlign.Center, modifier = Modifier.padding(32.dp),
+        )
+    }
+}
+
+@Composable
+private fun ChannelList(vm: RemoteViewModel, list: List<TvChannel>, now: Long) {
+    val state = rememberLazyListState()
+    LaunchedEffect(list) {
+        snapshotFlow { state.layoutInfo.visibleItemsInfo.mapNotNull { it.key as? Int } }
+            .distinctUntilChanged()
+            .collect { ids -> if (ids.isNotEmpty()) vm.needGuide((ids + list.take(20).map { it.id }).distinct()) }
+    }
+    LaunchedEffect(vm.filter, vm.query) { state.scrollToItem(0) }
+    if (list.isEmpty() && !vm.loading) { EmptyList(vm); return }
+    val playingId = vm.state?.playing?.id
+    LazyColumn(state = state, contentPadding = PaddingValues(bottom = 24.dp)) {
+        items(list, key = { it.id }) { ch ->
+            ChannelItem(ch, vm.guide[ch.id], now, ch.id == playingId) { vm.play(ch) }
+        }
+    }
+}
+
+/** Tablet: channels as cards in a grid. */
+@Composable
+private fun ChannelGrid(vm: RemoteViewModel, list: List<TvChannel>, now: Long) {
+    val state = rememberLazyGridState()
+    LaunchedEffect(list) {
+        snapshotFlow { state.layoutInfo.visibleItemsInfo.mapNotNull { it.key as? Int } }
+            .distinctUntilChanged()
+            .collect { ids -> if (ids.isNotEmpty()) vm.needGuide((ids + list.take(30).map { it.id }).distinct()) }
+    }
+    LaunchedEffect(vm.filter, vm.query) { state.scrollToItem(0) }
+    if (list.isEmpty() && !vm.loading) { EmptyList(vm); return }
+    val playingId = vm.state?.playing?.id
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(330.dp), state = state,
+        contentPadding = PaddingValues(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        items(list, key = { it.id }) { ch ->
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = if (ch.id == playingId) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
+                ),
+            ) {
+                ChannelItem(ch, vm.guide[ch.id], now, ch.id == playingId, highlight = false) { vm.play(ch) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChannelItem(ch: TvChannel, guide: List<GuideItem>?, now: Long, playing: Boolean, highlight: Boolean = true, onClick: () -> Unit) {
     val on = guide?.firstOrNull { it.isOn(now) }
     val next = guide?.firstOrNull { it.startMs >= (on?.endMs ?: now) }
-    val bg = if (playing) MaterialTheme.colorScheme.primaryContainer else Color0
+    val bg = if (playing && highlight) MaterialTheme.colorScheme.primaryContainer else Color0
     Row(
         Modifier.fillMaxWidth().background(bg).clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,

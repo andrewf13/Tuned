@@ -35,6 +35,17 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var filter by mutableStateOf(store.lastFilter)
         private set
+    var themeMode by mutableStateOf(store.themeMode)
+        private set
+
+    fun chooseTheme(mode: String) { themeMode = mode; store.themeMode = mode }
+
+    /** Keep the home-screen widget in step with what the app last saw. */
+    private fun refreshWidget() {
+        store.widgetChannels = lineup.channels.filter { it.fav }.map { it.id to it.name }
+        store.nowPlaying = state?.playing?.name
+        ChannelWidget.updateAll(getApplication())
+    }
     var query by mutableStateOf("")
     var loading by mutableStateOf(false)
         private set
@@ -102,6 +113,7 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
         store.tv = null
         client = null
         lineup = Lineup(emptyList(), emptyList()); guide.clear(); state = null
+        ChannelWidget.updateAll(getApplication())
         page = Page.Find
     }
 
@@ -116,6 +128,7 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
                 lineup = c.lineup()
                 state = c.state()
                 problem = null
+                refreshWidget()
                 if (filter == "fav" && lineup.channels.none { it.fav }) filter = "all"
                 if (filter.startsWith("g:") && lineup.groups.none { "g:${it.id}" == filter }) filter = "all"
             } catch (e: TvException) {
@@ -171,6 +184,7 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 state = c.play(ch.id)
                 toast = "Now on ${state?.name ?: "TV"}: ${ch.name}"
+                refreshWidget()
             } catch (e: TvException) {
                 toast = e.message
             } catch (e: Exception) {
