@@ -19,6 +19,8 @@ There's **one APK for every device below**: the same file works on all of them.
 https://raw.githubusercontent.com/andrewf13/Tuned/main/releases/tuned-latest.apk
 ```
 
+**📱 Tuned for phones & tablets (new, beta):** [⬇ Tuned for Android phones and tablets](https://raw.githubusercontent.com/andrewf13/Tuned/main/releases/tuned-mobile-latest.apk) (10 MB, Android 8.0+). The full player on your phone or tablet. See [section 9](#9-tuned-on-phones--tablets). Version **0.1.0**.
+
 **📱 Phone & tablet remote (optional):** [⬇ Tuned Remote](https://raw.githubusercontent.com/andrewf13/Tuned/main/releases/tuned-remote-latest.apk) (7 MB, Android 8.0+ phones and tablets). Current version **1.0.0**, with the **sports guide**. See [section 6](#6-phone-remote).
 
 | Device | Status | Refresh-rate switching | HDR |
@@ -263,6 +265,34 @@ A backup holds **every profile** (logins and playlist links) with each one's **f
 | No "what's on" text | TV → Settings → TV guide: tick the countries your channels are from and press Update now |
 
 ---
+
+## 9. Tuned on phones & tablets
+
+A standalone version of Tuned for Android phones and tablets (made on a Galaxy S25 and Galaxy Tab S9 FE). It's the same engine as the TV app: Xtream Codes and M3U, profiles, favourites, groups, the TV guide and the Sports tab. **The backup format is the same too**: save a backup on the TV, copy the `.tunedbak` file to your phone, and restore it to get your providers, favourites and groups.
+
+![Tuned on a phone](docs/mobile-phone.png)
+
+**Watching**
+| Where | What |
+|---|---|
+| Portrait | Video on top, what's on now/next below, and the channel list underneath: tap to switch |
+| Rotate to landscape (or tap ⛶) | Full screen |
+| Full screen: **far left** | **Brightness** slider (or drag up/down anywhere on the left) |
+| Full screen: **far right** | **Volume** slider (or drag up/down anywhere on the right) |
+| Full screen: swipe left / right in the middle | Next / previous channel |
+| Full screen: tap | Show or hide the controls: channel, what's on, time, ★, picture-in-picture, Fit/Zoom/Stretch, **Channels** list |
+| ▣ or leave the app while watching | **Picture-in-picture**: keeps playing in a small window (automatic on Android 12+) |
+| Long-press any channel | Add to / remove from ★ Favourites |
+
+![Full screen with the brightness and volume sliders](docs/mobile-fullscreen.png)
+
+**Tabs:** Live TV (tap the title to pick a group, with a filter for long group lists, and 🔍 to search every channel), Favourites, Sports (straight from the guide, no TV needed), Settings (providers, light/dark/system, channel order, groups, buffer, volume boost, TV guide countries, backup & restore).
+
+On a tablet, groups sit down the side and channels fill the screen; in landscape the player shows the channel list beside the video.
+
+![Tuned on a tablet](docs/mobile-tablet.png)
+
+TV-only features don't apply on phones: refresh-rate switching and the phone-remote server.
 
 ## Licence
 Tuned is open source under the [Apache License 2.0](LICENSE): you can use, change and share it, including commercially, as long as you keep the licence and copyright notices. See [`NOTICE`](NOTICE) for the open-source libraries it's built with.

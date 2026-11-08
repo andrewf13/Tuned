@@ -1,6 +1,6 @@
 # Tuned: source
 
-Two apps: `app/` (Tuned, the TV player) and `phone/` (Tuned Remote, the phone companion).
+Modules: `core/` (shared: logins, profiles, guide, backup, player engine), `app/` (Tuned for TV), `mobile/` (Tuned for phones and tablets) and `phone/` (Tuned Remote, the TV's phone companion).
 
 Kotlin, Compose for TV, Media3. One universal APK (Android 6.0+, all CPU types) for Shield, Google TV and Fire TV.
 
@@ -33,4 +33,4 @@ echo "sdk.dir=/path/to/android-sdk" > local.properties
 - `data/Backup*.kt`: backup contents, passphrase encryption (PBKDF2 → AES-256-GCM), Download/Tuned storage
 - `ui/`: Login, Home (groups + channels over live video), Player (info bar, recents, channel list), Groups, channels-in-a-group, Settings, Backup, themes
 
-Release: bump `versionCode`/`versionName` in `app/build.gradle.kts`, run `./gradlew testDebugUnitTest assembleRelease` with the signing variables set, copy `app-release.apk` to `../releases/tuned-x.y.z.apk` and `tuned-latest.apk`, and `phone-release.apk` to `tuned-remote-x.y.z.apk` and `tuned-remote-latest.apk`, add the `.sha256`, and update the version in the user guide.
+Release: bump `versionCode`/`versionName` in `app/build.gradle.kts`, run `./gradlew testDebugUnitTest assembleRelease` with the signing variables set, copy `app-release.apk` to `../releases/tuned-x.y.z.apk` and `tuned-latest.apk`, `phone-release.apk` to `tuned-remote-x.y.z.apk` and `tuned-remote-latest.apk`, and `mobile-release.apk` to `tuned-mobile-x.y.z.apk` and `tuned-mobile-latest.apk`, add the `.sha256`, and update the version in the user guide.

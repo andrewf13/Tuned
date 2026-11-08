@@ -17,5 +17,7 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "Tuned"
-include(":app")
+include(":core") // shared: logins, guide, backup, player engine
+include(":app")   // Tuned for Android TV / Google TV / Fire TV
 include(":phone") // Tuned Remote: the phone companion
+include(":mobile") // Tuned for phones and tablets
