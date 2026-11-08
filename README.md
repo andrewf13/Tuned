@@ -12,14 +12,14 @@ A fast, simple IPTV player for Android TV and Fire TV. Sign in with Xtream Codes
 
 There's **one APK for every device below**: the same file works on all of them.
 
-**[⬇ Download the latest APK](https://github.com/andrewf13/Tuned/raw/main/releases/tuned-latest.apk)** (10 MB, Android 6.0 or newer). Current version **1.0.0** · SHA-256 in [`releases/tuned-1.0.0.apk.sha256`](releases/tuned-1.0.0.apk.sha256)
+**[⬇ Download the latest APK](https://raw.githubusercontent.com/andrewf13/Tuned/main/releases/tuned-latest.apk)** (10 MB, Android 6.0 or newer). Current version **1.0.0** · SHA-256 in [`releases/tuned-1.0.0.apk.sha256`](releases/tuned-1.0.0.apk.sha256)
 
 **Link to type into Downloader on your TV** (always the newest version):
 ```
-https://github.com/andrewf13/Tuned/raw/main/releases/tuned-latest.apk
+https://raw.githubusercontent.com/andrewf13/Tuned/main/releases/tuned-latest.apk
 ```
 
-**📱 Phone & tablet remote (optional):** [⬇ Tuned Remote](https://github.com/andrewf13/Tuned/raw/main/releases/tuned-remote-latest.apk) (7 MB, Android 8.0+ phones and tablets). Current version **1.0.0**, with the **sports guide**. See [section 6](#6-phone-remote).
+**📱 Phone & tablet remote (optional):** [⬇ Tuned Remote](https://raw.githubusercontent.com/andrewf13/Tuned/main/releases/tuned-remote-latest.apk) (7 MB, Android 8.0+ phones and tablets). Current version **1.0.0**, with the **sports guide**. See [section 6](#6-phone-remote).
 
 | Device | Status | Refresh-rate switching | HDR |
 |---|---|---|---|
@@ -177,7 +177,7 @@ Ticking a channel in an unticked group shows the group again, with just your tic
 
 ![Tuned Remote on a phone](docs/phone-remote.png)
 
-1. On the phone, open the [Tuned Remote download](https://github.com/andrewf13/Tuned/raw/main/releases/tuned-remote-latest.apk) and install it (allow your browser to install apps when asked).
+1. On the phone, open the [Tuned Remote download](https://raw.githubusercontent.com/andrewf13/Tuned/main/releases/tuned-remote-latest.apk) and install it (allow your browser to install apps when asked).
 2. Open **Tuned on the TV**. The phone and TV must be on the same Wi-Fi.
 3. Open **Tuned Remote**: the TV appears in the list. Tap it.
 4. A **4-digit code** appears on the TV. Type it on the phone. Done: the phone remembers the TV.
