@@ -1,0 +1,7 @@
+<resources>
+    <color name="bg">#FF0D0F13</color>
+    <style name="Theme.Tuned" parent="@android:style/Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="android:colorAccent">#FF7CC4FF</item>
+    </style>
+</resources>
